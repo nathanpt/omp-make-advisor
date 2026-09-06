@@ -14,11 +14,11 @@ interface SpawnedHost {
 	cleanup(): void;
 }
 
-function spawnHost(): SpawnedHost {
+function spawnHost(preload?: string): SpawnedHost {
 	const dir = mkdtempSync(join(tmpdir(), "oma-tui-"));
 	const eventsPath = join(dir, "events.jsonl");
 	const proc = Bun.spawn({
-		cmd: [process.execPath, "run", join(import.meta.dir, "host.ts"), eventsPath],
+		cmd: [process.execPath, "run", join(import.meta.dir, "host.ts"), eventsPath, ...(preload ? [preload] : [])],
 		pty: true,
 		stdin: "pipe",
 		stdout: "ignore",
@@ -155,6 +155,34 @@ test("cancel flow", async () => {
 		assert.equal(done.result, null);
 		assert.equal(finalEvents.filter((e) => e.type === "done").length, 1, "done must fire exactly once");
 		assert.equal(finalEvents.filter((e) => e.type === "disposed").length, 1, "disposed must fire exactly once");
+	} finally {
+		host.cleanup();
+	}
+});
+
+test("preload statuses from brief", async () => {
+	const host = spawnHost(JSON.stringify({ dropIds: ["t2"] }));
+	try {
+		const events = (await host.waitUntil((es) =>
+			es.some((e) => (e as Event).type === "frame"),
+		)) as Event[];
+		const firstFrame = events.find((e) => e.type === "frame") as { lines: string[] };
+		assert.ok(
+			firstFrame.lines.some((line) => line.includes("[drop] Never swallow")),
+			`first frame must show the preloaded drop\n${firstFrame.lines.join("\n")}`,
+		);
+		assert.equal(
+			firstFrame.lines.filter((line) => line.includes("[keep]")).length,
+			2,
+			`expected 2 [keep] markers\n${firstFrame.lines.join("\n")}`,
+		);
+
+		host.write("\r");
+		await host.waitUntil((es) => es.some((e) => (e as Event).type === "done"));
+		assert.equal(await host.exited, 0);
+		const finalEvents = host.readAll() as Event[];
+		const done = finalEvents.find((e) => e.type === "done") as { result: { kept: string[]; dropped: string[] } | null };
+		assert.deepEqual(done.result, { kept: ["t1", "t3"], dropped: ["t2"] });
 	} finally {
 		host.cleanup();
 	}

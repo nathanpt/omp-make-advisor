@@ -27,8 +27,12 @@ export class TrapPicker implements Component {
 		private readonly candidates: readonly CandidateTrap[],
 		private readonly keybindings: KeybindingsLike,
 		private readonly done: (result: PickerResult | undefined) => void,
+		initialStates?: ReadonlyMap<string, "keep" | "drop">,
 	) {
-		this.states = new Map(candidates.map((c) => [c.id, "keep" as const]));
+		// Ids absent from initialStates default to keep (same as the bare picker).
+		this.states = new Map(
+			candidates.map((c) => [c.id, initialStates?.get(c.id) === "drop" ? ("drop" as const) : ("keep" as const)]),
+		);
 		this.list = this.buildList();
 	}
 

@@ -15,6 +15,20 @@ const STATIC_CANDIDATES: readonly CandidateTrap[] = [
 const eventsPath = process.argv[2];
 if (!eventsPath) throw new Error("usage: bun run test/tui/host.ts <events.jsonl>");
 
+// Optional third argv: JSON `{ "dropIds"?: string[] }` preloading drop statuses.
+// Invalid or absent JSON → no initial states (plain accept/cancel behavior).
+const initialStates: ReadonlyMap<string, "keep" | "drop"> | undefined = (() => {
+	const raw = process.argv[3];
+	if (!raw) return undefined;
+	try {
+		const parsed = JSON.parse(raw) as { dropIds?: unknown };
+		if (!Array.isArray(parsed.dropIds)) return undefined;
+		return new Map(parsed.dropIds.filter((id): id is string => typeof id === "string").map((id) => [id, "drop" as const]));
+	} catch {
+		return undefined;
+	}
+})();
+
 class Instrumented implements Component {
 	private lastKey: string | null = null;
 	private disposed = false;
@@ -59,11 +73,10 @@ const shutdown = (result: PickerResult | undefined) => {
 		process.exit(0);
 	}, 100);
 };
-
 // Stub keybindings deliberately disable app.interrupt in the host: Esc-cancel is
 // exercised through SelectList's own tui.select.cancel path, and interrupt
 // matching stays a production-only concern.
-const picker = new TrapPicker(STATIC_CANDIDATES, { matches: () => false }, shutdown);
+const picker = new TrapPicker(STATIC_CANDIDATES, { matches: () => false }, shutdown, initialStates);
 const wrapped = new Instrumented(picker);
 tui.showOverlay(wrapped);
 tui.setFocus(wrapped);
