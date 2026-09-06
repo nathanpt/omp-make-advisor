@@ -19,10 +19,10 @@ Updated: 2026-09-06 (f-003 implementation session)
 ## Confirmed working surfaces
 
 - `/oma scan` in a UI session (PTY-hosted omp 18.1.11, temp fixture repo): start notify renders;
-  4 `⟦task⟧` scouts fan out; scout-batch notifies render (batches 1–3 land in one redraw window,
-  batch 4 persists); `agent_end` completion notify fires but its toast line collides with the
-  model's contract reply ("oma: scan wrote N candidates to advisor-brief.md") — completion is
-  confirmed by the reply + on-disk brief, not the toast.
+  4 `⟦task⟧` scouts fan out; scout-batch notifies render (staggered scouts persist in frames;
+  near-simultaneous ones share a redraw window); at `agent_end` the completion notify
+  "oma: scan complete — N candidates in advisor-brief.md" rendered in full post-simplify-pass
+  (an earlier run saw it collide with the model's reply toast — timing, not logic).
 - Bare `/oma` after a scan: picker opens on the scanned candidates with statuses preloaded
   (re-open showed `❯ [drop] …` for a previously dropped trap); `space`+`Enter` →
   `oma: brief updated — kept 10, dropped 1` toast and the brief on disk shows the flipped
@@ -108,6 +108,38 @@ Resolved this session:
     — the plan's "ingest map"/"auth errors"/"schema.sql" fall past the 60-col label cut;
     (c) E2E file named `scan.e2e.test.ts` (bun requires `.test.` in filenames);
     (d) completion toast collides with the model reply line (rendering artifact; see surfaces).
+- Simplify pass (2026-09-06, post-f-003 review): three read-only lanes (reuse; quality;
+  efficiency) over `56338ba..b90ba24`. Applied:
+  - `scanState` moved into the factory closure (efficiency lane, verified against OMP source:
+    task subagents re-run the extension factory against the same module instance, so
+    module-level state let a scout's `agent_end` close the root's scan phase — latent under the
+    18.1.11 runtime where notifies rendered, live under the 18.1.12 semantics the devDeps
+    compile against).
+  - `agent_end` handler honors `AgentEndEvent.willContinue` (documented contract: non-terminal
+    auto-retry settles must not close the scan phase; platform-canonical pattern in omp's
+    warp-events).
+  - `runPicker` distinguishes ENOENT ("run /oma scan first") from other read errors
+    (EACCES/EISDIR → "unreadable (code) — check permissions"); previously every failure claimed
+    the file was missing.
+  - Dropped the weightless `BriefCandidate→CandidateTrap` field-strip (structural subtyping
+    covers it; `CandidateTrap` import removed) and the unused `SCOUT_LENSES` export (lens names
+    live once, in the prompt literal).
+  - E2E imports `BRIEF_FILENAME` instead of hardcoding `advisor-brief.md`; 590s watchdog +
+    `proc.kill()` in finally stop the timeout path from leaking a hung omp and the temp dir.
+  - AGENTS.md `npm test` line updated to the `test/*.test.ts` glob.
+  Rejected: sharing one fixture between brief/PTY suites (no cross-dependency; coupling for
+  symmetry), a `TrapStatus` alias (plan pinned inline unions), brief-mtime freshness check
+  (rare window; the model reply line is the primary signal), templating the prompt with
+  `BRIEF_FILENAME` (prompt is the plan-pinned literal; the E2E already couples prompt↔parser).
+  Incident during the pass: the watchdog fix initially declared `proc`/`watchdog` inside the
+  `try` block — invisible to `finally` (ReferenceError after passing assertions; tsconfig
+  excludes tests, so typecheck could not catch it). Fixed by hoisting both declarations above
+  `try`; live E2E re-run green.
+  Verification: typecheck + `npm test` (7) + `npm run test:tui` (3) + probe (`ready`) green;
+  live E2E `1 pass` (197s); interactive PTY re-check — bare `/oma` with no brief renders the
+  ENOENT warning, `/oma scan` renders start + batch + full "oma: scan complete — 11 candidates
+  in advisor-brief.md" notify, `/oma` picker → space+Enter writes `· drop ·` back with
+  evidence intact.
 - Incidents and corrections (2026-09-06):
   - **Masked test failure**: after the picker landed (f-002 commit), `npm test` under
     tsx/node began failing with `ERR_UNSUPPORTED_ESM_URL_SCHEME: Received protocol 'bun:'` —

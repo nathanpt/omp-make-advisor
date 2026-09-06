@@ -1,8 +1,6 @@
 // The scan-phase prompt sent to the session agent. The candidate-block shape and
 // the advisor-brief.md layout below are the load-bearing contract shared with
 // src/brief.ts's parser — change them together or not at all.
-export const SCOUT_LENSES = ["conc", "err", "data", "build"] as const;
-
 export function buildScanPrompt(): string {
 	return `You are running the omp-make-advisor scan phase. Fan out exactly 4 parallel read-only scout
 tasks using your task/subagent tool, one per lens:

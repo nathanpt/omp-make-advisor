@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { parseBrief } from "../../src/brief.ts";
+import { BRIEF_FILENAME, parseBrief } from "../../src/brief.ts";
 import { buildScanPrompt } from "../../src/scan.ts";
 
 const EXTENSION = join(import.meta.dir, "..", "..", "index.ts");
@@ -84,18 +84,23 @@ e2e(
 	"live /oma scan writes a parseable advisor-brief.md",
 	async () => {
 		const dir = mkdtempSync(join(tmpdir(), "oma-e2e-"));
+		plantFixture(dir);
+		// Slash-command dispatch under `omp -p` does not start the scan turn
+		// (observed: exit 0, no agent turn, no brief) — per plan contingency the
+		// E2E drives the scan prompt directly; command wiring is proven by the
+		// interactive PTY check.
+		const proc = Bun.spawn({
+			cmd: ["omp", "-e", EXTENSION, "-p", buildScanPrompt()],
+			cwd: dir,
+			stdout: "pipe",
+			stderr: "pipe",
+		});
+		// Kill a hung omp just inside the 600s test timeout so the awaits below
+		// settle and the finally cleanup actually runs (bun abandons a timed-out
+		// test without unwinding it). Declared before try: the finally clause
+		// cannot see consts scoped to the try block.
+		const watchdog = setTimeout(() => proc.kill(), 590_000);
 		try {
-			plantFixture(dir);
-			// Slash-command dispatch under `omp -p` does not start the scan turn
-			// (observed: exit 0, no agent turn, no brief) — per plan contingency the
-			// E2E drives the scan prompt directly; command wiring is proven by the
-			// interactive PTY check.
-			const proc = Bun.spawn({
-				cmd: ["omp", "-e", EXTENSION, "-p", buildScanPrompt()],
-				cwd: dir,
-				stdout: "pipe",
-				stderr: "pipe",
-			});
 			const [code, stdout, stderr] = await Promise.all([
 				proc.exited,
 				new Response(proc.stdout).text(),
@@ -103,7 +108,7 @@ e2e(
 			]);
 			assert.equal(code, 0, `omp exited ${code}\nstdout:\n${stdout}\nstderr:\n${stderr}`);
 
-			const briefPath = join(dir, "advisor-brief.md");
+			const briefPath = join(dir, BRIEF_FILENAME);
 			assert.ok(existsSync(briefPath), `advisor-brief.md missing; stdout:\n${stdout}`);
 			const { candidates } = parseBrief(readFileSync(briefPath, "utf8"));
 			assert.ok(
@@ -118,6 +123,8 @@ e2e(
 				`no candidate has an existing evidence path; candidates:\n${JSON.stringify(candidates, null, 2)}`,
 			);
 		} finally {
+			clearTimeout(watchdog);
+			proc.kill(); // no-op after exit; guards the failure path mid-run
 			rmSync(dir, { recursive: true, force: true });
 		}
 	},
