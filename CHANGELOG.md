@@ -13,8 +13,9 @@ is a runnable artifact; until then changes accumulate under Unreleased.
   (`docs/design-docs/DESIGN.md`; recorded as ADR-0001).
 
 ### Added
-- Repository foundation: `README.md`, `AGENTS.md` router, `PROGRESS.md`, `ARCHITECTURE.md`
-  (planned-state map), machine-readable feature contract (`docs/feature-list.json`, 9 features),
-  decision layer (`docs/decisions/` with ADR-0001), exec-plan scaffolding
-  (`docs/exec-plans/active/`, `docs/exec-plans/completed/`), source reading list
-  (`docs/references/index.md`), and `init.sh` documentation-baseline check.
+- Extension scaffold: `package.json` + `tsconfig.json` (npm, node ≥22, tsx/tsc; bun for PTY
+  tests), `/make-advisor` + `/oma` command skeleton with `hasUI` guard (f-001).
+- Static trap picker overlay (f-002): `SelectList`-based keep/drop picker mounted via
+  `ctx.ui.custom(…, { overlay: true })`, static candidates in `src/traps.ts`.
+- PTY snapshot harness (`test/tui/`): bun-spawned pi-tui host emitting JSONL frame/done/disposed
+  events, driven by `bun test` accept/cancel flow tests; wired into `./init.sh`.

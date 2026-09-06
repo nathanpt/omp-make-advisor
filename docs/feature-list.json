@@ -31,8 +31,8 @@
         "Verify width safety on a narrow terminal (no wrapping artifacts)",
         "Headless snapshot test drives the overlay through a PTY harness and asserts frames"
       ],
-      "passes": false,
-      "evidence": null,
+      "passes": true,
+      "evidence": "bun test test/tui/: accept + cancel flows pass; frame assertions on [keep]/[drop] labels and done/disposed events",
       "priority": 2,
       "dependencies": ["f-001"],
       "source": "DESIGN.md §6 slice 2, §10 MVP item 1"

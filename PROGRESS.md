@@ -4,24 +4,29 @@ Updated: 2026-09-06 (slices 1–2 implementation session)
 
 ## Current repository state
 
-- Git repository initialized (`main`); foundation docs committed, then package scaffold.
-- Slice 1 landed (f-001): `index.ts` registers `/make-advisor` + `/oma` (same options object —
-  `registerCommand` has no alias field), `hasUI`-guarded, notify acknowledgement.
-- Slice 2 (f-002) in flight: static trap picker overlay + PTY snapshot harness.
-- Toolchain decided (matches `omp-langfuse` prior art): npm + node ≥22 + `tsx --test` +
-  `tsc --noEmit`; `bun` only for the PTY test suite; no build step (`omp -e index.ts` loads TS
-  directly). devDeps pinned `@oh-my-pi/pi-coding-agent`/`-pi-tui` 18.1.12 vs omp 18.1.11 runtime.
+- Git repository initialized (`main`); seven commits: foundation docs → package scaffold → f-001
+  skeleton → f-002 picker → PTY harness → loader-test runner fix → this state record.
+- Slice 1 (f-001) and slice 2 (f-002) complete and passing: `/make-advisor` + `/oma` register with
+  a `hasUI` guard; the command mounts the static trap picker overlay (`ctx.ui.custom`, overlay
+  mode); PTY snapshot tests gate the slice.
+- Toolchain: npm + node ≥22 + `tsc --noEmit`; **bun runs both test suites** (`npm test`,
+  `npm run test:tui`); no build step (`omp -e index.ts` loads TS directly); tsx removed (dead
+  after the runner switch). devDeps `@oh-my-pi/pi-coding-agent`/`-pi-tui` 18.1.12 vs omp 18.1.11
+  runtime — no drift observed.
 
 ## Confirmed working surfaces
 
-- `/make-advisor` and `/oma` in a UI session: notify line renders (verified under a PTY-hosted
-  omp 18.1.11 session).
+- `/make-advisor` and `/oma` in a UI session (PTY-hosted omp 18.1.11): notify line renders.
+- Trap picker overlay in a UI session: opens with three `[keep]` traps + evidence descriptions;
+  `↓` moves the cursor, `space` toggles `[keep]`↔`[drop]`, `Enter` → `oma: kept 2, dropped 1 …`
+  toast, `Esc` → `oma: cancelled - nothing recorded` toast; overlay closes cleanly afterward.
 - Headless load: `omp -e ./index.ts -p …` exits 0, replies `ready`, no UI attempt.
+- PTY harness (`test/tui/`): 60-col host renders frames; accept and cancel flows pass.
 
 ## Active work
 
-f-002 (static trap picker): `src/traps.ts`, `src/picker.ts`, overlay mount in `index.ts`, PTY
-snapshot harness `test/tui/`. Next after that: f-003 scout scan.
+None in flight. Next feature per selection rule: `f-003` (scout scan feeding real candidate
+traps with evidence paths into `advisor-brief.md`).
 
 ## Blockers and unknowns
 
@@ -29,8 +34,8 @@ Open questions carried from DESIGN.md §11 (none block the MVP):
 
 1. Does `omp -p --advisor` expose drain/dump semantics sufficient for unattended scoring? Probe
    before building the automated validator (feature `f-008`).
-2. ~~pi-tui TestBackend vs PTY harness~~ Resolved by plan: PTY harness (`test/tui/host.ts`),
-   bun-spawned, JSONL frame events.
+2. ~~pi-tui TestBackend vs PTY harness~~ Resolved: PTY harness (`test/tui/host.ts`), bun-spawned,
+   JSONL frame events — landed and passing.
 3. Pricing source for cost preview (models.db vs hardcoded).
 4. Scoring judge: string-match on severity vs a judge model.
 5. Upstream posture: contribute the extension to the OMP ecosystem or keep it local.
@@ -38,26 +43,55 @@ Open questions carried from DESIGN.md §11 (none block the MVP):
 Resolved this session:
 
 - Handler contract: `registerCommand(name, { description?, handler })` where handler is
-  `(args: string, ctx: ExtensionCommandContext)`. ctx types import from
-  `@oh-my-pi/pi-coding-agent` root (`ExtensionAPI`, `ExtensionCommandContext` both exported).
+  `(args: string, ctx: ExtensionCommandContext)`. Types import from the
+  `@oh-my-pi/pi-coding-agent` root (`ExtensionAPI`, `ExtensionCommandContext` both exported);
   `ctx.ui.notify(message, type?)`.
+- In-session imports of `@oh-my-pi/pi-tui` value exports and `getSelectListTheme()` from
+  `@oh-my-pi/pi-coding-agent` resolve inside omp (plan contingency; did not trigger).
+- `@oh-my-pi/pi-tui` sources import `bun:` protocols (e.g. `src/terminal.ts`), so any value
+  import of the extension graph is unloadable under node/tsx — all tests run under bun.
+- `Bun.spawn({ pty: true })` needs explicit `stdin: "pipe"` for `proc.stdin` to exist, and honors
+  `COLUMNS`/`LINES` env (host reported 60 cols).
+- SelectList filter stays off while `items.length <= maxVisible` (`#canEditSearch`), so `space`
+  never feeds a type-to-filter buffer in the picker.
 
 ## Verification status
 
 - f-001 (2026-09-06, all pass):
   - `npm run typecheck` — clean, 0 errors.
-  - `npm test` — `# pass 1 # fail 0` (loader factory test).
+  - loader test — 1 pass (runner: bun since the fix below; passed under tsx at f-001 time
+    because index.ts had no runtime pi-tui imports yet).
   - `npm run probe` — `PROBE_EXIT=0`, replied `ready` (headless load, hasUI guard silent).
   - Interactive under PTY (hub-hosted omp 18.1.11, cwd temp target project): `/make-advisor` and
-    `/oma` each rendered the notify toast `omp-make-advisor: skeleton loaded — trap picker lands
-    in slice 2 (f-002)` (confirmed in PTY captures).
-  - `./init.sh` — docs checks + typecheck + `npm test` all green (`All checks passed.`).
-- Plan deviation (recorded): `bun test test/tui/` is NOT yet in init.sh — it exits 1 while
-  `test/tui/` does not exist, which would leave the repo red between the Step 3 and Step 5
-  commits. It joins init.sh in the Step 5 commit alongside the harness. AGENTS.md notes this.
+    `/oma` each rendered the notify toast (confirmed in PTY captures).
+- f-002 (2026-09-06, all pass):
+  - `npm run typecheck` — clean with picker + overlay mount. Loader test 1 pass. `npm run
+    probe` — exit 0, `ready`.
+  - Interactive under PTY: overlay opens (three `[keep]` rows, `❯` cursor, evidence column);
+    `↓`+`space` → `[drop] Silent catch…` frame; `Enter` → toast `oma: kept 2, dropped 1 - brief
+    write lands with f-003`; reopen + `Esc` → toast `oma: cancelled - nothing recorded`.
+  - `npm run test:tui` — `2 pass 0 fail` (accept flow: 60-col size event, three titles, 3×
+    `[keep]`, `\x1b[B`+` `+`\r` → `{kept:["t1","t3"],dropped:["t2"]}`, `[drop]` frame, exactly one
+    `done` + one `disposed`, exit 0; cancel flow: `\x1b` → `result: null`, exit 0).
+  - `./init.sh` — docs checks + typecheck + `npm test` + `npm run test:tui` all green
+    (`INIT_EXIT=0`, `All checks passed.`).
+- Incidents and corrections (2026-09-06):
+  - **Masked test failure**: after the picker landed (f-002 commit), `npm test` under
+    tsx/node began failing with `ERR_UNSUPPORTED_ESM_URL_SCHEME: Received protocol 'bun:'` —
+    `@oh-my-pi/pi-tui/src/terminal.ts` imports `bun:` protocols, so node cannot load the
+    extension graph. Two verification runs piped `npm test` through `tail`, which returned 0 and
+    hid the failure (caught later by an unpiped `./init.sh` run: exit 1). Fix: loader test runs
+    under bun (`bun test test/loader.test.ts`), `tsx` devDep removed, AGENTS.md Commands updated.
+    Post-fix true exit codes: typecheck 0, `npm test` 0 (1 pass), `npm run test:tui` 0 (2 pass).
+    Lesson recorded: never verify through a pipe; check `$?`/`PIPESTATUS` of the test binary.
+  - **Plan deviations** (recorded): (a) `bun test test/tui/` entered init.sh at Step 5, not
+    Step 3 — it exits 1 while `test/tui/` does not exist, which would leave the repo red between
+    commits; (b) the plan's `tsx --test` runner was unsatisfiable once the extension imports
+    pi-tui values (see incident above) — replaced with bun; (c) handler ctx typed as
+    `ExtensionCommandContext` (real exported type) instead of the plan's inline structural
+    annotation.
 
 ## Next useful move
 
-Land f-002: `src/traps.ts` + `src/picker.ts` + overlay mount, then the PTY snapshot harness
-(`test/tui/host.ts` + `test/tui/picker.test.ts`) gating the slice; then f-003 (scout scan feeding
-real candidates).
+Start `f-003`: read-only scout tasks propose candidate traps with evidence paths, feeding real
+candidates into `advisor-brief.md` (which doubles as the headless fallback path).
