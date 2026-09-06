@@ -1,6 +1,13 @@
 import type { ExtensionAPI, ExtensionCommandContext } from "@oh-my-pi/pi-coding-agent";
-import { STATIC_CANDIDATES } from "./src/traps.js";
+import type { CandidateTrap } from "./src/brief.js";
 import { TrapPicker, type PickerResult } from "./src/picker.js";
+
+// Interim static fixture; /oma scan replaces it as the candidate source (f-003 step 3).
+const STATIC_CANDIDATES: readonly CandidateTrap[] = [
+	{ id: "t1", title: "Any write to the shared ingest map must hold the ingest lock", evidence: "src/ingest/loop.ts:41-58" },
+	{ id: "t2", title: "Never swallow or soften auth errors in session refresh paths", evidence: "src/auth/session.ts:88" },
+	{ id: "t3", title: "Any migration must update db/schema.sql in the same change", evidence: "db/migrations/0042_add_flags.sql" },
+];
 
 const commandOptions = {
 	description: "Interview the project and emit its watchdogs (oma)",

@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "bun test test/loader.test.ts",
+    "test": "bun test test/*.test.ts",
     "test:tui": "bun test test/tui/",
     "probe": "omp -e ./index.ts -p \"reply with the single word ready\""
   },

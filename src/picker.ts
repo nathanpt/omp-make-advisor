@@ -1,7 +1,7 @@
 import { SelectList, truncateToWidth } from "@oh-my-pi/pi-tui";
 import type { Component, Keybinding } from "@oh-my-pi/pi-tui";
 import { getSelectListTheme } from "@oh-my-pi/pi-coding-agent";
-import type { CandidateTrap } from "./traps.js";
+import type { CandidateTrap } from "./brief.js";
 
 export interface PickerResult {
 	kept: string[];

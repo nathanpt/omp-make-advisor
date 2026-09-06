@@ -1,8 +1,16 @@
 import { appendFileSync } from "node:fs";
 import { ProcessTerminal, TUI } from "@oh-my-pi/pi-tui";
 import type { Component } from "@oh-my-pi/pi-tui";
-import { STATIC_CANDIDATES } from "../../src/traps.js";
+import type { CandidateTrap } from "../../src/brief.js";
 import { TrapPicker, type PickerResult } from "../../src/picker.js";
+
+// Watch-rule titles: a trap is a future-facing rule for the advisor, not a
+// bug report. Mirrors the shape scouts will write into advisor-brief.md.
+const STATIC_CANDIDATES: readonly CandidateTrap[] = [
+	{ id: "t1", title: "Any write to the shared ingest map must hold the ingest lock", evidence: "src/ingest/loop.ts:41-58" },
+	{ id: "t2", title: "Never swallow or soften auth errors in session refresh paths", evidence: "src/auth/session.ts:88" },
+	{ id: "t3", title: "Any migration must update db/schema.sql in the same change", evidence: "db/migrations/0042_add_flags.sql" },
+];
 
 const eventsPath = process.argv[2];
 if (!eventsPath) throw new Error("usage: bun run test/tui/host.ts <events.jsonl>");

@@ -86,9 +86,9 @@ test("accept flow", async () => {
 		assert.equal(size?.cols, 60, `expected 60 columns, got ${JSON.stringify(size)}`);
 		const firstFrame = events.find((e) => e.type === "frame") as { lines: string[] };
 		for (const title of [
-			"Concurrent map writes",
-			"Silent catch swallows",
-			"Fixture drift between",
+			"Any write to the", // label column truncates at 30 cols; substrings must fit
+			"Never swallow",
+			"Any migration must",
 		]) {
 			assert.ok(
 				firstFrame.lines.some((line) => line.includes(title)),
@@ -114,7 +114,7 @@ test("accept flow", async () => {
 		host.write(" ");
 		await host.waitUntil((es) => {
 			const frames = es.filter((e) => (e as Event).type === "frame") as { lines: string[] }[];
-			return frames.some((f) => f.lines.some((line) => line.includes("[drop] Silent catch")));
+			return frames.some((f) => f.lines.some((line) => line.includes("[drop] Never swallow")));
 		});
 		host.write("\r");
 
@@ -127,8 +127,8 @@ test("accept flow", async () => {
 
 		const frames = finalEvents.filter((e) => e.type === "frame") as { lines: string[] }[];
 		assert.ok(
-			frames.some((f) => f.lines.some((line) => line.includes("[drop] Silent catch"))),
-			"no frame shows [drop] Silent catch",
+			frames.some((f) => f.lines.some((line) => line.includes("[drop] Never swallow"))),
+			"no frame shows [drop] Never swallow",
 		);
 		assert.equal(finalEvents.filter((e) => e.type === "done").length, 1, "done must fire exactly once");
 		const disposedAt = finalEvents.findIndex((e) => e.type === "disposed");
