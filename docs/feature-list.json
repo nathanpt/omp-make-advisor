@@ -47,8 +47,8 @@
         "Notify-level progress observed during the scan",
         "Brief file round-trips: reload preserves candidates and per-trap status"
       ],
-      "passes": false,
-      "evidence": null,
+      "passes": true,
+      "evidence": "npm run test:e2e (OMA_E2E=1): scan wrote 11-candidate brief in planted fixture, all evidence paths exist; interactive PTY /oma scan: start + scout-batch notifies, brief written; /oma picker preload + status write-back + Esc byte-identical verified; brief round-trip + reload-status tests in test/brief.test.ts; typecheck/test/test:tui/probe green",
       "priority": 3,
       "dependencies": ["f-002"],
       "source": "DESIGN.md §10 MVP item 2, §6 slice 5 (minimal)"

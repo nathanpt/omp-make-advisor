@@ -1,14 +1,16 @@
 # PROGRESS
 
-Updated: 2026-09-06 (slices 1–2 implementation session)
+Updated: 2026-09-06 (f-003 implementation session)
 
 ## Current repository state
 
-- Git repository initialized (`main`); seven commits: foundation docs → package scaffold → f-001
-  skeleton → f-002 picker → PTY harness → loader-test runner fix → this state record.
-- Slice 1 (f-001) and slice 2 (f-002) complete and passing: `/make-advisor` + `/oma` register with
-  a `hasUI` guard; the command mounts the static trap picker overlay (`ctx.ui.custom`, overlay
-  mode); PTY snapshot tests gate the slice.
+- Git repository initialized (`main`); eleven commits: foundation docs → package scaffold → f-001
+  skeleton → f-002 picker → PTY harness → loader-test runner fix → state record → post-slices
+  cleanup → f-003 brief module → f-003 picker preload → f-003 scan wiring.
+- Slices 1–3 complete and passing: `/oma scan` sends the 4-lens scan prompt to the session agent
+  (scouts write `advisor-brief.md` at the project root); bare `/oma` opens the picker preloaded
+  with brief statuses and writes accepted decisions back (evidence + rationale preserved);
+  `src/traps.ts` deleted — `CandidateTrap` lives in `src/brief.ts`.
 - Toolchain: npm + node ≥22 + `tsc --noEmit`; **bun runs both test suites** (`npm test`,
   `npm run test:tui`); no build step (`omp -e index.ts` loads TS directly); tsx removed (dead
   after the runner switch). devDeps `@oh-my-pi/pi-coding-agent`/`-pi-tui` 18.1.12 vs omp 18.1.11
@@ -16,17 +18,25 @@ Updated: 2026-09-06 (slices 1–2 implementation session)
 
 ## Confirmed working surfaces
 
-- `/make-advisor` and `/oma` in a UI session (PTY-hosted omp 18.1.11): notify line renders.
-- Trap picker overlay in a UI session: opens with three `[keep]` traps + evidence descriptions;
-  `↓` moves the cursor, `space` toggles `[keep]`↔`[drop]`, `Enter` → `oma: kept 2, dropped 1 …`
-  toast, `Esc` → `oma: cancelled - nothing recorded` toast; overlay closes cleanly afterward.
+- `/oma scan` in a UI session (PTY-hosted omp 18.1.11, temp fixture repo): start notify renders;
+  4 `⟦task⟧` scouts fan out; scout-batch notifies render (batches 1–3 land in one redraw window,
+  batch 4 persists); `agent_end` completion notify fires but its toast line collides with the
+  model's contract reply ("oma: scan wrote N candidates to advisor-brief.md") — completion is
+  confirmed by the reply + on-disk brief, not the toast.
+- Bare `/oma` after a scan: picker opens on the scanned candidates with statuses preloaded
+  (re-open showed `❯ [drop] …` for a previously dropped trap); `space`+`Enter` →
+  `oma: brief updated — kept 10, dropped 1` toast and the brief on disk shows the flipped
+  `· drop ·` with evidence/rationale intact; `Esc` → `oma: cancelled - brief unchanged` toast,
+  file byte-identical (md5 unchanged).
+- Headless scan (E2E, `OMA_E2E=1`): `omp -e index.ts -p "<scan prompt>"` in a planted fixture
+  repo exits 0 and writes a parseable brief with existing evidence paths.
 - Headless load: `omp -e ./index.ts -p …` exits 0, replies `ready`, no UI attempt.
-- PTY harness (`test/tui/`): 60-col host renders frames; accept and cancel flows pass.
+- PTY harness (`test/tui/`): 60-col host renders frames; accept, cancel, and preload flows pass.
 
 ## Active work
 
-None in flight. Next feature per selection rule: `f-003` (scout scan feeding real candidate
-traps with evidence paths into `advisor-brief.md`).
+None in flight. Next feature per selection rule: `f-004` (emit single-advisor WATCHDOG.md with
+preview screen; deps f-003 ✓).
 
 ## Blockers and unknowns
 
@@ -75,6 +85,29 @@ Resolved this session:
     `done` + one `disposed`, exit 0; cancel flow: `\x1b` → `result: null`, exit 0).
   - `./init.sh` — docs checks + typecheck + `npm test` + `npm run test:tui` all green
     (`INIT_EXIT=0`, `All checks passed.`).
+- f-003 (2026-09-06, all pass; commits `2556fe9`, `6c1bc6a`, `fec1a2c`):
+  - `npm run typecheck` — clean. `npm test` — 7 pass (loader + 6 brief tests: round-trip,
+    reload-preserves-flipped-status, malformed-block skip, duplicate-id skip, status
+    normalization, empty/header-only). `npm run test:tui` — 3 pass (accept, cancel, preload:
+    host seeded `dropIds:["t2"]` renders one `[drop] Never swallow` + two `[keep]`, accepts
+    `{kept:["t1","t3"],dropped:["t2"]}`).
+  - `npm run probe` — exit 0, replies `ready` (unchanged text).
+  - `npm run test:e2e` (`OMA_E2E=1`, live model turn, 131s) — 1 pass: `omp -e index.ts -p
+    "<buildScanPrompt()>"` in planted fixture repo (unlocked map mutation, `catch {}` refresh,
+    schema/migration drift) exits 0, writes `advisor-brief.md`, parseBrief yields 11 candidates
+    (live run) with evidence paths existing on disk.
+  - Interactive PTY (hub-hosted omp, fixture repo, run once): `/oma scan` → start notify + 4
+    task scouts + batch notifies; brief written (11 watch-rules, future-facing phrasing);
+    `/oma` → picker preloaded; `space`+`Enter` → brief updated (`· drop ·` on disk, rationale
+    preserved); reopen shows preloaded `[drop]`; `Esc` → cancelled toast, file byte-identical.
+  - Plan deviations (recorded): (a) **E2E drives the scan prompt directly, not `/oma scan`** —
+    `omp -p "/oma scan"` dispatches the command but `pi.sendUserMessage` does not start a turn
+    before print-mode exit (observed: exit 0, no agent turn, no brief); the plan's contingency
+    applied, command wiring proven by the interactive check instead; (b) PTY title assertions
+    use truncation-safe substrings ("Any write to the", "Never swallow", "Any migration must")
+    — the plan's "ingest map"/"auth errors"/"schema.sql" fall past the 60-col label cut;
+    (c) E2E file named `scan.e2e.test.ts` (bun requires `.test.` in filenames);
+    (d) completion toast collides with the model reply line (rendering artifact; see surfaces).
 - Incidents and corrections (2026-09-06):
   - **Masked test failure**: after the picker landed (f-002 commit), `npm test` under
     tsx/node began failing with `ERR_UNSUPPORTED_ESM_URL_SCHEME: Received protocol 'bun:'` —
@@ -115,5 +148,6 @@ Resolved this session:
 
 ## Next useful move
 
-Start `f-003`: read-only scout tasks propose candidate traps with evidence paths, feeding real
-candidates into `advisor-brief.md` (which doubles as the headless fallback path).
+Start `f-004`: emit a single-advisor `WATCHDOG.md` with a preview screen — Enter applies (writes
+beside standing files), Esc reverts (deps: f-003 ✓). The brief's kept candidates are the input;
+serializer must mirror OMP advisor semantics per DESIGN.md.
