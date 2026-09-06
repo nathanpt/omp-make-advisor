@@ -1,0 +1,152 @@
+{
+  "project": "omp-make-advisor",
+  "updated": "2026-09-06",
+  "selection_rule": "Take exactly one highest-priority feature with passes=false whose dependencies all pass. Update only passes/evidence/updated when checks succeed; never weaken or delete requirements.",
+  "features": [
+    {
+      "id": "f-001",
+      "category": "functional",
+      "description": "/make-advisor (alias oma) command skeleton loads as an OMP extension: registers the command, acknowledges via notify, guarded by ctx.hasUI",
+      "steps": [
+        "Scaffold the extension package and record build/test/check commands in AGENTS.md",
+        "Load the extension in a real OMP session",
+        "Run /make-advisor and observe the notify acknowledgement",
+        "Run a headless (omp -p) session with the extension loaded: no crash, no UI attempt",
+        "Record the toolchain decision and exact commands in PROGRESS.md"
+      ],
+      "passes": false,
+      "evidence": null,
+      "priority": 1,
+      "dependencies": [],
+      "source": "DESIGN.md §6 slice 1, §10 MVP item 1"
+    },
+    {
+      "id": "f-002",
+      "category": "functional",
+      "description": "Static trap picker: hardcoded candidates in a SelectList overlay with keep/drop per trap, done() result consumed by the extension",
+      "steps": [
+        "Hardcode 3+ candidate traps in the extension",
+        "Open the picker via /make-advisor in a UI session",
+        "Navigate with list keys, toggle keep/drop, confirm done() fires exactly once and dispose() is idempotent",
+        "Verify width safety on a narrow terminal (no wrapping artifacts)",
+        "Headless snapshot test drives the overlay through a PTY harness and asserts frames"
+      ],
+      "passes": false,
+      "evidence": null,
+      "priority": 2,
+      "dependencies": ["f-001"],
+      "source": "DESIGN.md §6 slice 2, §10 MVP item 1"
+    },
+    {
+      "id": "f-003",
+      "category": "functional",
+      "description": "Scout scan feeds real candidate traps with evidence paths into advisor-brief.md, with minimal notify-level progress",
+      "steps": [
+        "Fan out parallel read-only task scouts with a strict candidate contract",
+        "Candidates land in advisor-brief.md, each with an evidence path",
+        "Notify-level progress observed during the scan",
+        "Brief file round-trips: reload preserves candidates and per-trap status"
+      ],
+      "passes": false,
+      "evidence": null,
+      "priority": 3,
+      "dependencies": ["f-002"],
+      "source": "DESIGN.md §10 MVP item 2, §6 slice 5 (minimal)"
+    },
+    {
+      "id": "f-004",
+      "category": "functional",
+      "description": "Emit a single-advisor WATCHDOG.md with a preview screen: Enter applies (writes beside standing files), Esc reverts",
+      "steps": [
+        "Preview screen renders the exact content to be emitted",
+        "Enter writes the file beside standing files (emit-beside path) and never modifies an existing WATCHDOG.md",
+        "Esc leaves the filesystem unchanged",
+        "Golden test: emitted content matches OMP serializer semantics (literal block scalars, round-trip safe)"
+      ],
+      "passes": false,
+      "evidence": null,
+      "priority": 4,
+      "dependencies": ["f-003"],
+      "source": "DESIGN.md §10 MVP item 3, §6 slice 4"
+    },
+    {
+      "id": "f-005",
+      "category": "validation",
+      "description": "3-5 hand-built trap fixtures plus clean negatives, with a manual precision run of the advisor over them",
+      "steps": [
+        "Plant fixtures (violations and clean negatives) in a scratch repo",
+        "Run the advisor over the fixtures",
+        "Record per-trap flagged/missed manually",
+        "Clean fixtures stay unflagged (no false positives)",
+        "Log results in PROGRESS.md"
+      ],
+      "passes": false,
+      "evidence": null,
+      "priority": 5,
+      "dependencies": ["f-004"],
+      "source": "DESIGN.md §10 MVP item 4, §7"
+    },
+    {
+      "id": "f-006",
+      "category": "functional",
+      "description": "Full interview stepper: per-trap evidence inline, progress bar, keep/edit/drop with a free-text edit path",
+      "steps": [
+        "One trap per screen with its evidence lines inline",
+        "Progress indicator (e.g. 3/12) reflects interview state",
+        "Edit flow round-trips free text into the brief and back",
+        "Snapshot tests cover each screen"
+      ],
+      "passes": false,
+      "evidence": null,
+      "priority": 6,
+      "dependencies": ["f-003"],
+      "source": "DESIGN.md §10 Next item 1, §6 slices 3-4"
+    },
+    {
+      "id": "f-007",
+      "category": "functional",
+      "description": "Emit a starter WATCHDOG.yml roster (2-3 roles) with model/tool suggestions alongside the WATCHDOG.md",
+      "steps": [
+        "Roster validates against OMP's advisor discovery walk",
+        "Round-trip safe against OMP's config serializer semantics",
+        "Golden test for the emitted YAML"
+      ],
+      "passes": false,
+      "evidence": null,
+      "priority": 7,
+      "dependencies": ["f-004"],
+      "source": "DESIGN.md §10 Next item 2"
+    },
+    {
+      "id": "f-008",
+      "category": "validation",
+      "description": "Automated fixture validator and report screen: precision table, cost, keep/retune/drop verdict",
+      "steps": [
+        "Resolve open question 1: probe omp -p --advisor drain/dump semantics for unattended runs",
+        "Run the advisor headless over the fixture set",
+        "Render the scored report (precision, cost, verdict)",
+        "Report screen has a snapshot test"
+      ],
+      "passes": false,
+      "evidence": null,
+      "priority": 8,
+      "dependencies": ["f-005", "f-007"],
+      "source": "DESIGN.md §10 Next item 3, §6 slice 6, §7"
+    },
+    {
+      "id": "f-009",
+      "category": "functional",
+      "description": "Doctor-style staleness nudge: detect stale or missing watchdog pair and suggest re-running the flow",
+      "steps": [
+        "Detects a missing watchdog pair",
+        "Detects a staleness signal (define precisely during implementation)",
+        "Nudge is non-destructive and has a headless variant"
+      ],
+      "passes": false,
+      "evidence": null,
+      "priority": 9,
+      "dependencies": ["f-004"],
+      "source": "DESIGN.md §10 Next item 4"
+    }
+  ]
+}
