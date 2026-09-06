@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test test/*.test.ts",
+    "test": "bun test test/loader.test.ts",
     "test:tui": "bun test test/tui/",
     "probe": "omp -e ./index.ts -p \"reply with the single word ready\""
   },
@@ -15,7 +15,6 @@
   "devDependencies": {
     "@oh-my-pi/pi-coding-agent": "18.1.12",
     "@oh-my-pi/pi-tui": "18.1.12",
-    "tsx": "^4.19.0",
     "typescript": "^5.9.0"
   },
   "engines": { "node": ">=22" }
