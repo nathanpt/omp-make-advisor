@@ -15,6 +15,9 @@ learning vehicle for TUI design on OMP's real stack. Extension scaffold landed w
 - `npm run test:tui` — bun test over `test/tui/` (PTY snapshot tests, f-002 gate).
 - `npm run probe` — headless omp load check: `omp -e ./index.ts -p "reply with the single word ready"`.
 - `./init.sh` — docs checks plus typecheck and tests (full gate).
+- Persistent install (user scope, links this working tree — no build step, edits are live):
+  `omp install /mnt/dev/projects/omp-make-advisor`. Requires the `"omp": { "extensions": […] }`
+  manifest in package.json — the installed-plugin discovery path has no index.ts fallback.
 - Interactive: `cd "$(mktemp -d)" && omp -e /mnt/dev/projects/omp-make-advisor/index.ts`, then run
   `/make-advisor` or `/oma`. Must run under a real PTY (omp via `hub` or a terminal), not a pipe.
 

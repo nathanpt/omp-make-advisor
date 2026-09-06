@@ -3,6 +3,10 @@
   "version": "0.0.1",
   "description": "OMP extension that interviews a project and emits the watchdogs that guard it",
   "type": "module",
+  "main": "./index.ts",
+  "omp": {
+    "extensions": ["./index.ts"]
+  },
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "bun test test/*.test.ts",

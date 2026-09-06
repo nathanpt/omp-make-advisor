@@ -140,6 +140,17 @@ Resolved this session:
   ENOENT warning, `/oma scan` renders start + batch + full "oma: scan complete — 11 candidates
   in advisor-brief.md" notify, `/oma` picker → space+Enter writes `· drop ·` back with
   evidence intact.
+- User-testing fix (2026-09-06, first real install): `omp install` linked the package but the
+  extension never loaded — the installed-plugin discovery path (`plugins/loader.ts`
+  `resolvePluginManifestEntries`) resolves ONLY `package.json`'s `"omp"/"pi"` manifest
+  `extensions` entries; the `index.ts` fallback applies to directory discovery, not the plugin
+  lock path. With no manifest, `/oma scan` fell through to the model as plain prose (user got a
+  repo report instead of a scan). Fix: package.json gains `"main": "./index.ts"` +
+  `"omp": { "extensions": ["./index.ts"] }`; no reinstall needed (the lock stores only
+  version/enabled — the manifest is read live). Verified: headless `-p "/oma scan"` in a temp
+  dir dispatches silently (1.2s, no model turn); live PTY session in herdr-lantern via plugin
+  discovery (no `-e`): `/oma scan` → start + completion notifies, 9-candidate
+  advisor-brief.md written with line-ranged evidence across all four lenses.
 - Incidents and corrections (2026-09-06):
   - **Masked test failure**: after the picker landed (f-002 commit), `npm test` under
     tsx/node began failing with `ERR_UNSUPPORTED_ESM_URL_SCHEME: Received protocol 'bun:'` —
