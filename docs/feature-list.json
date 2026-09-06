@@ -14,8 +14,8 @@
         "Run a headless (omp -p) session with the extension loaded: no crash, no UI attempt",
         "Record the toolchain decision and exact commands in PROGRESS.md"
       ],
-      "passes": false,
-      "evidence": null,
+      "passes": true,
+      "evidence": "typecheck/test/probe pass + interactive /make-advisor and /oma notify verified",
       "priority": 1,
       "dependencies": [],
       "source": "DESIGN.md §6 slice 1, §10 MVP item 1"

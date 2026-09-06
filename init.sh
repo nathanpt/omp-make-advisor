@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # init.sh — development/check entry point for omp-make-advisor.
 #
-# Status: pre-implementation. There is no extension to build or run yet, so this
-# script runs the documentation baseline checks only. Slice 1 (feature f-001)
-# replaces the placeholder sections below with the real setup/build/test path.
-# Keep this script honest at every step: no hidden failures, no fake success.
+# Status: slice 1 landed (f-001). This script runs the documentation baseline
+# checks plus the extension toolchain (typecheck + tests); the PTY-driven TUI
+# suite joins with f-002. Keep this script honest at every step: no hidden
+# failures, no fake success.
 #
 # Usage: ./init.sh
 
@@ -12,10 +12,10 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 echo "== omp-make-advisor init =="
-echo "Status: pre-implementation (documentation baseline only)"
+echo "Status: docs + toolchain checks (slice 1+)"
 
 # --- Prerequisites ---------------------------------------------------------
-for tool in python3; do
+for tool in python3 node npm bun; do
   if ! command -v "$tool" >/dev/null 2>&1; then
     echo "MISSING prerequisite: $tool" >&2
     exit 1
@@ -23,12 +23,12 @@ for tool in python3; do
 done
 
 # --- Setup -----------------------------------------------------------------
-# Placeholder: nothing to install yet. Extension dependencies land with slice 1
-# (feature f-001) and must be recorded in AGENTS.md "Commands".
+# One-time per clone: `npm install` (deps: @oh-my-pi/pi-coding-agent, -pi-tui,
+# tsx, typescript). No build step; omp loads index.ts directly via `omp -e`.
 
 # --- Start -----------------------------------------------------------------
-# Placeholder: nothing to start yet. From f-001 the extension loads inside an
-# OMP session via /make-advisor (alias oma).
+# Interactive only: `omp -e /path/to/this/repo/index.ts` from a target project
+# (see AGENTS.md "Commands"). This script starts nothing.
 
 # --- Baseline checks -------------------------------------------------------
 python3 - <<'EOF'
@@ -67,7 +67,13 @@ if failures:
 print(f'OK: {len(features)} features, deps resolve, links resolve, AGENTS.md {agents_lines} lines')
 EOF
 
-echo "Baseline checks passed."
+
+# --- Toolchain checks --------------------------------------------------------
+npm run typecheck
+npm test
+# `bun test test/tui/` joins here when the PTY harness lands (f-002).
+
+echo "All checks passed."
 
 # --- Stop / cleanup --------------------------------------------------------
 # Nothing to stop or clean up; this script writes no state.

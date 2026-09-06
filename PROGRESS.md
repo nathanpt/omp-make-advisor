@@ -1,24 +1,27 @@
 # PROGRESS
 
-Updated: 2026-09-06 (foundation session)
+Updated: 2026-09-06 (slices 1–2 implementation session)
 
 ## Current repository state
 
-- Design complete enough to build from: `docs/design-docs/DESIGN.md` (reframed 2026-09-06 from a
-  standalone Rust binary to an OMP extension + skill).
-- No code, no package scaffold, no tests.
-- Not a git repository yet — no history, nothing committed.
+- Git repository initialized (`main`); foundation docs committed, then package scaffold.
+- Slice 1 landed (f-001): `index.ts` registers `/make-advisor` + `/oma` (same options object —
+  `registerCommand` has no alias field), `hasUI`-guarded, notify acknowledgement.
+- Slice 2 (f-002) in flight: static trap picker overlay + PTY snapshot harness.
+- Toolchain decided (matches `omp-langfuse` prior art): npm + node ≥22 + `tsx --test` +
+  `tsc --noEmit`; `bun` only for the PTY test suite; no build step (`omp -e index.ts` loads TS
+  directly). devDeps pinned `@oh-my-pi/pi-coding-agent`/`-pi-tui` 18.1.12 vs omp 18.1.11 runtime.
 
 ## Confirmed working surfaces
 
-None — nothing runnable exists yet.
+- `/make-advisor` and `/oma` in a UI session: notify line renders (verified under a PTY-hosted
+  omp 18.1.11 session).
+- Headless load: `omp -e ./index.ts -p …` exits 0, replies `ready`, no UI attempt.
 
 ## Active work
 
-None in flight. Foundation documents created this session: `README.md`, `AGENTS.md`,
-`PROGRESS.md` (this file), `ARCHITECTURE.md`, `CHANGELOG.md`, `init.sh`,
-`docs/feature-list.json`, `docs/decisions/` (README + ADR-0001),
-`docs/exec-plans/{active,completed}/`, `docs/references/index.md`.
+f-002 (static trap picker): `src/traps.ts`, `src/picker.ts`, overlay mount in `index.ts`, PTY
+snapshot harness `test/tui/`. Next after that: f-003 scout scan.
 
 ## Blockers and unknowns
 
@@ -26,29 +29,35 @@ Open questions carried from DESIGN.md §11 (none block the MVP):
 
 1. Does `omp -p --advisor` expose drain/dump semantics sufficient for unattended scoring? Probe
    before building the automated validator (feature `f-008`).
-2. Does `pi-tui` expose a TestBackend / gallery-fixture path for unit-level frame asserts, or is a
-   PTY harness (`.omp/tools/tui.ts` style) the only route? Probe before slice 2's snapshot test.
+2. ~~pi-tui TestBackend vs PTY harness~~ Resolved by plan: PTY harness (`test/tui/host.ts`),
+   bun-spawned, JSONL frame events.
 3. Pricing source for cost preview (models.db vs hardcoded).
 4. Scoring judge: string-match on severity vs a judge model.
 5. Upstream posture: contribute the extension to the OMP ecosystem or keep it local.
 
-Foundation unknowns:
+Resolved this session:
 
-- Extension build/package/test toolchain (package manager, test runner, repo layout) — decided by
-  slice 1; must be recorded in AGENTS.md "Commands" then.
-- Location of the vault's TUI design language (referenced by DESIGN.md) — not in this repo.
+- Handler contract: `registerCommand(name, { description?, handler })` where handler is
+  `(args: string, ctx: ExtensionCommandContext)`. ctx types import from
+  `@oh-my-pi/pi-coding-agent` root (`ExtensionAPI`, `ExtensionCommandContext` both exported).
+  `ctx.ui.notify(message, type?)`.
 
 ## Verification status
 
-- Documentation only so far; no code verification applicable.
-- `./init.sh` (run 2026-09-06, after all foundation files landed): `OK: 9 features, deps
-  resolve, links resolve, AGENTS.md 74 lines` — pass. Covers feature-contract JSON validity,
-  dependency references, markdown link resolution, and the AGENTS.md line budget.
-- Earlier same-session spot checks (python3 JSON/link/line-count assertions) — pass, consistent
-  with the init.sh result.
+- f-001 (2026-09-06, all pass):
+  - `npm run typecheck` — clean, 0 errors.
+  - `npm test` — `# pass 1 # fail 0` (loader factory test).
+  - `npm run probe` — `PROBE_EXIT=0`, replied `ready` (headless load, hasUI guard silent).
+  - Interactive under PTY (hub-hosted omp 18.1.11, cwd temp target project): `/make-advisor` and
+    `/oma` each rendered the notify toast `omp-make-advisor: skeleton loaded — trap picker lands
+    in slice 2 (f-002)` (confirmed in PTY captures).
+  - `./init.sh` — docs checks + typecheck + `npm test` all green (`All checks passed.`).
+- Plan deviation (recorded): `bun test test/tui/` is NOT yet in init.sh — it exits 1 while
+  `test/tui/` does not exist, which would leave the repo red between the Step 3 and Step 5
+  commits. It joins init.sh in the Step 5 commit alongside the harness. AGENTS.md notes this.
 
 ## Next useful move
 
-`git init` + initial commit of the foundation (owner go-ahead required — not done automatically),
-then start feature `f-001`: scaffold the extension and land slice 1 (command skeleton + `hasUI`
-guard).
+Land f-002: `src/traps.ts` + `src/picker.ts` + overlay mount, then the PTY snapshot harness
+(`test/tui/host.ts` + `test/tui/picker.test.ts`) gating the slice; then f-003 (scout scan feeding
+real candidates).

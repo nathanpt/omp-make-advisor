@@ -4,19 +4,18 @@
 
 OMP extension + skill that interviews a project and emits a watchdog pair (`WATCHDOG.md` +
 `WATCHDOG.yml`) guarding its specific traps, with a `pi-tui` stepper for the interview. Also a
-learning vehicle for TUI design on OMP's real stack. **Pre-implementation**: no code exists yet;
+learning vehicle for TUI design on OMP's real stack. Extension scaffold landed with slice 1;
 `docs/design-docs/DESIGN.md` is the authoritative design.
 
 ## Commands
 
-No code commands yet — the extension is not scaffolded. What exists:
-
-- `./init.sh` — baseline documentation checks (feature-contract JSON, link resolution, AGENTS.md
-  line budget). Currently the only runnable entry point.
-
-Extension build/test/check commands are established by curriculum slice 1 and must be recorded
-here and in PROGRESS.md at that point. Until then, treat "how do I run the extension" as blocked,
-not as something to improvise.
+- `npm run typecheck` — `tsc --noEmit` over `index.ts` + `src/**/*.ts` (tests excluded).
+- `npm test` — node test runner (tsx) over `test/*.test.ts`.
+- `npm run test:tui` — bun test over `test/tui/` (PTY snapshot tests; harness lands with f-002).
+- `npm run probe` — headless omp load check: `omp -e ./index.ts -p "reply with the single word ready"`.
+- `./init.sh` — docs checks plus typecheck and tests (full gate).
+- Interactive: `cd "$(mktemp -d)" && omp -e /mnt/dev/projects/omp-make-advisor/index.ts`, then run
+  `/make-advisor` or `/oma`. Must run under a real PTY (omp via `hub` or a terminal), not a pipe.
 
 ## Hard constraints (priority order)
 
