@@ -1,15 +1,17 @@
 import { test } from "bun:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 interface SpawnedHost {
-	eventsPath: string;
 	write(data: string): void;
 	waitUntil(predicate: (events: unknown[]) => boolean, timeoutMs?: number): Promise<unknown[]>;
+	/** Snapshot of the events file as it stands right now. */
+	readAll(): unknown[];
 	exited: Promise<number>;
-	kill(): void;
+	/** Kill the host (no-op after exit) and remove its temp events file. */
+	cleanup(): void;
 }
 
 function spawnHost(): SpawnedHost {
@@ -24,20 +26,31 @@ function spawnHost(): SpawnedHost {
 		env: { ...process.env, COLUMNS: "60", LINES: "20" },
 	});
 	const readEvents = (): unknown[] => {
+		let raw: string;
 		try {
-			return readFileSync(eventsPath, "utf8")
-				.split("\n")
-				.filter((line) => line.length > 0)
-				.map((line) => JSON.parse(line));
+			raw = readFileSync(eventsPath, "utf8");
 		} catch {
 			return [];
 		}
+		const events: unknown[] = [];
+		for (const line of raw.split("\n")) {
+			if (!line) continue;
+			try {
+				events.push(JSON.parse(line));
+			} catch {
+				// Torn tail from an in-flight append; the next poll re-reads it whole.
+			}
+		}
+		return events;
 	};
 	const waitUntil = async (predicate: (events: unknown[]) => boolean, timeoutMs = 5000): Promise<unknown[]> => {
 		const deadline = Date.now() + timeoutMs;
 		for (;;) {
 			const events = readEvents();
 			if (predicate(events)) return events;
+			if (proc.exitCode !== null) {
+				throw new Error(`host exited (code ${proc.exitCode}) before satisfying predicate; events: ${JSON.stringify(events)}`);
+			}
 			if (Date.now() > deadline) throw new Error(`timeout waiting for events; got: ${JSON.stringify(events)}`);
 			// Real delay by necessity: the awaited condition is JSONL output written
 			// by an external PTY child process, which fake timers cannot advance.
@@ -47,11 +60,14 @@ function spawnHost(): SpawnedHost {
 		}
 	};
 	return {
-		eventsPath,
 		write: proc.stdin.write.bind(proc.stdin),
 		waitUntil,
+		readAll: readEvents,
 		exited: proc.exited,
-		kill: proc.kill.bind(proc),
+		cleanup: () => {
+			proc.kill();
+			rmSync(dir, { recursive: true, force: true });
+		},
 	};
 }
 
@@ -79,19 +95,33 @@ test("accept flow", async () => {
 				`first frame missing title: ${title}\n${firstFrame.lines.join("\n")}`,
 			);
 		}
+		assert.ok(
+			firstFrame.lines.some((line) => line.includes("esc cancel")),
+			`cancel hint must survive at the 60-col snapshot width\n${firstFrame.lines.join("\n")}`,
+		);
 		assert.equal(
 			firstFrame.lines.filter((line) => line.includes("[keep]")).length,
 			3,
 			`expected 3 [keep] markers\n${firstFrame.lines.join("\n")}`,
 		);
 
+		// Pace each keystroke on observable frame progression: batching all
+		// inputs at once lets the host coalesce renders, and the only [drop]
+		// frame would land after dispose (where the harness suppresses frames).
 		host.write("\x1b[B");
+		const frameCount = (es: unknown[]) => es.filter((e) => (e as Event).type === "frame").length;
+		await host.waitUntil((es) => frameCount(es) >= 2);
 		host.write(" ");
+		await host.waitUntil((es) => {
+			const frames = es.filter((e) => (e as Event).type === "frame") as { lines: string[] }[];
+			return frames.some((f) => f.lines.some((line) => line.includes("[drop] Silent catch")));
+		});
 		host.write("\r");
 
-		const finalEvents = (await host.waitUntil((es) =>
-			es.some((e) => (e as Event).type === "done"),
-		)) as Event[];
+		await host.waitUntil((es) => es.some((e) => (e as Event).type === "done"));
+		assert.equal(await host.exited, 0);
+		// Assert on the final event stream, after the host's exit window closes.
+		const finalEvents = host.readAll() as Event[];
 		const done = finalEvents.find((e) => e.type === "done") as { result: { kept: string[]; dropped: string[] } | null };
 		assert.deepEqual(done.result, { kept: ["t1", "t3"], dropped: ["t2"] });
 
@@ -101,11 +131,15 @@ test("accept flow", async () => {
 			"no frame shows [drop] Silent catch",
 		);
 		assert.equal(finalEvents.filter((e) => e.type === "done").length, 1, "done must fire exactly once");
+		const disposedAt = finalEvents.findIndex((e) => e.type === "disposed");
+		assert.ok(disposedAt >= 0, "disposed event missing");
 		assert.equal(finalEvents.filter((e) => e.type === "disposed").length, 1, "disposed must fire exactly once");
-
-		assert.equal(await host.exited, 0);
+		assert.ok(
+			!finalEvents.slice(disposedAt + 1).some((e) => e.type === "frame"),
+			"no frame may be emitted after disposed",
+		);
 	} finally {
-		host.kill();
+		host.cleanup();
 	}
 });
 
@@ -114,13 +148,14 @@ test("cancel flow", async () => {
 	try {
 		await host.waitUntil((es) => es.some((e) => (e as Event).type === "frame"));
 		host.write("\x1b");
-		const finalEvents = (await host.waitUntil((es) =>
-			es.some((e) => (e as Event).type === "done"),
-		)) as Event[];
+		await host.waitUntil((es) => es.some((e) => (e as Event).type === "done"));
+		assert.equal(await host.exited, 0);
+		const finalEvents = host.readAll() as Event[];
 		const done = finalEvents.find((e) => e.type === "done") as { result: unknown };
 		assert.equal(done.result, null);
-		assert.equal(await host.exited, 0);
+		assert.equal(finalEvents.filter((e) => e.type === "done").length, 1, "done must fire exactly once");
+		assert.equal(finalEvents.filter((e) => e.type === "disposed").length, 1, "disposed must fire exactly once");
 	} finally {
-		host.kill();
+		host.cleanup();
 	}
 });

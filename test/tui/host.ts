@@ -8,26 +8,32 @@ const eventsPath = process.argv[2];
 if (!eventsPath) throw new Error("usage: bun run test/tui/host.ts <events.jsonl>");
 
 class Instrumented implements Component {
-	private last: readonly string[] | null = null;
-	constructor(
-		private readonly picker: TrapPicker,
-		private readonly onDone: (result: PickerResult | undefined) => void,
-	) {}
+	private lastKey: string | null = null;
+	private disposed = false;
+
+	constructor(private readonly picker: TrapPicker) {}
+
 	render(width: number): readonly string[] {
 		const lines = this.picker.render(width);
-		if (lines !== this.last) {
-			this.last = lines;
+		const key = lines.join("\n");
+		if (!this.disposed && key !== this.lastKey) {
+			this.lastKey = key;
 			appendFileSync(eventsPath, JSON.stringify({ type: "frame", lines: [...lines] }) + "\n");
 		}
 		return lines;
 	}
+
 	handleInput(data: string): void {
 		this.picker.handleInput(data);
 	}
+
 	invalidate(): void {
 		this.picker.invalidate();
 	}
+
 	dispose(): void {
+		if (this.disposed) return;
+		this.disposed = true;
 		appendFileSync(eventsPath, JSON.stringify({ type: "disposed" }) + "\n");
 		this.picker.dispose();
 	}
@@ -46,8 +52,11 @@ const shutdown = (result: PickerResult | undefined) => {
 	}, 100);
 };
 
+// Stub keybindings deliberately disable app.interrupt in the host: Esc-cancel is
+// exercised through SelectList's own tui.select.cancel path, and interrupt
+// matching stays a production-only concern.
 const picker = new TrapPicker(STATIC_CANDIDATES, { matches: () => false }, shutdown);
-const wrapped = new Instrumented(picker, shutdown);
+const wrapped = new Instrumented(picker);
 tui.showOverlay(wrapped);
 tui.setFocus(wrapped);
 tui.start();

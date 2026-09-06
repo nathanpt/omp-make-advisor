@@ -90,6 +90,28 @@ Resolved this session:
     pi-tui values (see incident above) — replaced with bun; (c) handler ctx typed as
     `ExtensionCommandContext` (real exported type) instead of the plan's inline structural
     annotation.
+- Simplify pass (2026-09-06, post-slices review): two read-only reviewer lanes (reuse; quality/
+  lifecycle) over the full session diff. Applied to `src/picker.ts`, `test/tui/host.ts`,
+  `test/tui/picker.test.ts`, `package.json`:
+  - Width safety only on the picker-owned header (SelectList/ScrollView already tab-replace and
+    truncate every row — `scroll-view.ts` does `truncateToWidth(replaceTabs(row), …)`); header
+    shortened to fit 60 cols so the `esc cancel` hint is no longer elided (was 70 cols) and is
+    now asserted in the snapshot test.
+  - Filter disabled via `{ overflowSearch: false }` instead of the `max(8, N)` arithmetic trick
+    (SelectList's purpose-built option; identical output, robust to future row budgets).
+  - `finish`/`finishCancel` collapsed into one guarded `finish(result)` (single done-once choke
+    point); `KeybindingsLike.matches` now takes pi-tui's `Keybinding` union (typo-checked).
+  - Harness: dead `onDone` param removed; `Instrumented.dispose` append-once; no frame emitted
+    after `disposed`; frame dedup compares content (reference compare was a no-op); tests pace
+    each keystroke on observed frame progression (batched inputs let renders coalesce past
+    dispose — the old test only passed via post-dispose frames), assert final counts after host
+    exit, fail fast if the host dies mid-wait, and clean up temp dirs.
+  - peerDeps floor raised to `>=18.0.0` (16.x never tested).
+  Kept deliberately: the `\r`→`\n` remap (Enter must accept even if `tui.select.confirm` is
+  remapped; upstream mirrors this belt-and-braces), `KeybindingsLike` seam + host stub
+  (interrupt stays production-only), `Bun.sleep` avoided per repo test-timer rule.
+  Verification: `npm run test:tui` ×5 runs all exit 0; typecheck/test/probe exit 0; interactive
+  PTY session confirmed the new header renders untruncated and accept/cancel flows behave.
 
 ## Next useful move
 
