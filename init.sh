@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 # init.sh — development/check entry point for omp-make-advisor.
 #
-# Status: slice 1 landed (f-001). This script runs the documentation baseline
-# checks plus the extension toolchain (typecheck + tests); the PTY-driven TUI
-# suite joins with f-002. Keep this script honest at every step: no hidden
-# failures, no fake success.
+# Status: slices 1–2 landed (f-001, f-002). This script runs the documentation
+# baseline checks plus the extension toolchain (typecheck + both test suites).
+# Keep this script honest at every step: no hidden failures, no fake success.
 #
 # Usage: ./init.sh
 
@@ -67,11 +66,10 @@ if failures:
 print(f'OK: {len(features)} features, deps resolve, links resolve, AGENTS.md {agents_lines} lines')
 EOF
 
-
-# --- Toolchain checks --------------------------------------------------------
+# --- Toolchain checks -------------------------------------------------------
 npm run typecheck
 npm test
-# `bun test test/tui/` joins here when the PTY harness lands (f-002).
+npm run test:tui
 
 echo "All checks passed."
 

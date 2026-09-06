@@ -11,7 +11,7 @@ learning vehicle for TUI design on OMP's real stack. Extension scaffold landed w
 
 - `npm run typecheck` — `tsc --noEmit` over `index.ts` + `src/**/*.ts` (tests excluded).
 - `npm test` — node test runner (tsx) over `test/*.test.ts`.
-- `npm run test:tui` — bun test over `test/tui/` (PTY snapshot tests; harness lands with f-002).
+- `npm run test:tui` — bun test over `test/tui/` (PTY snapshot tests, f-002 gate).
 - `npm run probe` — headless omp load check: `omp -e ./index.ts -p "reply with the single word ready"`.
 - `./init.sh` — docs checks plus typecheck and tests (full gate).
 - Interactive: `cd "$(mktemp -d)" && omp -e /mnt/dev/projects/omp-make-advisor/index.ts`, then run
