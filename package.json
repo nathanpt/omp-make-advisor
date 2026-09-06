@@ -1,0 +1,22 @@
+{
+  "name": "omp-make-advisor",
+  "version": "0.0.1",
+  "description": "OMP extension that interviews a project and emits the watchdogs that guard it",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test test/*.test.ts",
+    "test:tui": "bun test test/tui/",
+    "probe": "omp -e ./index.ts -p \"reply with the single word ready\""
+  },
+  "peerDependencies": {
+    "@oh-my-pi/pi-coding-agent": ">=16.0.0"
+  },
+  "devDependencies": {
+    "@oh-my-pi/pi-coding-agent": "18.1.12",
+    "@oh-my-pi/pi-tui": "18.1.12",
+    "tsx": "^4.19.0",
+    "typescript": "^5.9.0"
+  },
+  "engines": { "node": ">=22" }
+}
