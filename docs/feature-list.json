@@ -1,6 +1,6 @@
 {
   "project": "omp-make-advisor",
-  "updated": "2026-09-06",
+  "updated": "2026-09-08",
   "selection_rule": "Take exactly one highest-priority feature with passes=false whose dependencies all pass. Update only passes/evidence/updated when checks succeed; never weaken or delete requirements.",
   "features": [
     {
@@ -48,7 +48,7 @@
         "Brief file round-trips: reload preserves candidates and per-trap status"
       ],
       "passes": true,
-      "evidence": "npm run test:e2e (OMA_E2E=1): scan wrote 11-candidate brief in planted fixture, all evidence paths exist; interactive PTY /oma scan: start + scout-batch notifies, brief written; /oma picker preload + status write-back + Esc byte-identical verified; brief round-trip + reload-status tests in test/brief.test.ts; typecheck/test/test:tui/probe green",
+      "evidence": "npm run test:e2e (OMA_E2E=1): scan wrote 11-candidate brief in planted fixture, all evidence paths exist; interactive PTY /oma scan: start + scout-batch notifies, brief written; /oma picker preload + status write-back + Esc byte-identical verified; brief round-trip + reload-status tests in test/brief.test.ts; typecheck/test/test:tui/probe green; post-self-scan hardening: verifyEvidenceAnchors flags unresolvable/past-EOF anchors at settle (unit-tested)",
       "priority": 3,
       "dependencies": ["f-002"],
       "source": "DESIGN.md §10 MVP item 2, §6 slice 5 (minimal)"
@@ -63,8 +63,8 @@
         "Esc leaves the filesystem unchanged",
         "Golden test: emitted content matches OMP serializer semantics (literal block scalars, round-trip safe)"
       ],
-      "passes": false,
-      "evidence": null,
+      "passes": true,
+      "evidence": "typecheck clean; npm test 11 pass (emit golden byte-exact + round-trip + clobber matrix); test:tui 6 pass (preview apply/cancel/scroll); probe exit 0 ready; ./init.sh INIT_EXIT=0; live PTY /oma emit: Enter wrote WATCHDOG.md cmp-identical to buildWatchdogMd, standing-file conflict wrote WATCHDOG.oma.md with standing md5 unchanged, Esc wrote nothing (PROGRESS.md 2026-09-08)",
       "priority": 4,
       "dependencies": ["f-003"],
       "source": "DESIGN.md §10 MVP item 3, §6 slice 4"
@@ -80,8 +80,8 @@
         "Clean fixtures stay unflagged (no false positives)",
         "Log results in PROGRESS.md"
       ],
-      "passes": false,
-      "evidence": null,
+      "passes": true,
+      "evidence": "bash test/fixtures/precision/run.sh (6 live headless scans, exit 0, briefs archived): 3/4 violations flagged with resolving evidence (conc-map 12/12, data-drift 6/6, build-gate 9/9); err-swallow keyword-miss with substance caught (9/11 resolved); clean negatives false-positived (clean-tidy 9, clean-empty 1 resolving candidates) — recorded as-is per pinned rule; per-fixture table in PROGRESS.md 2026-09-08",
       "priority": 5,
       "dependencies": ["f-004"],
       "source": "DESIGN.md §10 MVP item 4, §7"

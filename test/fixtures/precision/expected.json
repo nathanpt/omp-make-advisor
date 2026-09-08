@@ -1,0 +1,8 @@
+{
+  "conc-map":     { "kind": "violation", "lens": "conc", "expectKeywords": ["lock", "map"] },
+  "err-swallow":  { "kind": "violation", "lens": "err",  "expectKeywords": ["swallow", "auth"] },
+  "data-drift":   { "kind": "violation", "lens": "data", "expectKeywords": ["schema", "migration"] },
+  "build-gate":   { "kind": "violation", "lens": "build", "expectKeywords": ["test", "gate"] },
+  "clean-tidy":   { "kind": "clean" },
+  "clean-empty":  { "kind": "clean" }
+}

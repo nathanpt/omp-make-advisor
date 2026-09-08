@@ -1,7 +1,11 @@
 import type { ExtensionAPI, ExtensionCommandContext } from "@oh-my-pi/pi-coding-agent";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { TrapPicker, type PickerResult } from "./src/picker.js";
-import { readBrief, writeBrief } from "./src/brief.js";
+import { readBrief, verifyEvidenceAnchors, writeBrief } from "./src/brief.js";
 import { buildScanPrompt } from "./src/scan.js";
+import { buildWatchdogMd, emitWatchdog, WATCHDOG_FILENAME } from "./src/emit.js";
+import { WatchdogPreview } from "./src/preview.js";
 
 export default function omaExtension(pi: ExtensionAPI): void {
 	pi.setLabel("omp-make-advisor");
@@ -59,14 +63,69 @@ export default function omaExtension(pi: ExtensionAPI): void {
 		ctx.ui.notify(`oma: brief updated — kept ${result.kept.length}, dropped ${result.dropped.length}`, "info");
 	};
 
+	const runEmit = async (ctx: ExtensionCommandContext): Promise<void> => {
+		const read = readBrief(ctx.cwd);
+		if (!read.ok) {
+			// Headless failure is a no-op (D3 corollary): no notify channel,
+			// and the brief's absence is itself inspectable.
+			if (!ctx.hasUI) return;
+			const message =
+				read.error.code === "ENOENT"
+					? `oma: no advisor-brief.md in ${ctx.cwd} — run /oma scan first`
+					: `oma: advisor-brief.md unreadable (${read.error.code ?? "unknown error"}) — check permissions`;
+			ctx.ui.notify(message, "warning");
+			return;
+		}
+		const candidates = read.result.candidates;
+		if (candidates.length === 0) {
+			if (ctx.hasUI) ctx.ui.notify("oma: advisor-brief.md has no candidates", "warning");
+			return;
+		}
+		const kept = candidates.filter((c) => c.status === "keep");
+		if (kept.length === 0) {
+			if (ctx.hasUI) ctx.ui.notify("oma: no kept candidates in advisor-brief.md — nothing to emit", "warning");
+			return;
+		}
+		const content = buildWatchdogMd(candidates);
+		// The preview header names the file emitWatchdog will actually write;
+		// emitWatchdog's own existsSync stays authoritative at write time.
+		const targetName = existsSync(join(ctx.cwd, WATCHDOG_FILENAME)) ? "WATCHDOG.oma.md" : "WATCHDOG.md";
+		if (ctx.hasUI) {
+			const apply = await ctx.ui.custom<boolean | undefined>(
+				(_tui, _theme, keybindings, done) => new WatchdogPreview(content, targetName, keybindings, done),
+				{ overlay: true },
+			);
+			if (!apply) {
+				ctx.ui.notify("oma: cancelled - nothing written", "info");
+				return;
+			}
+		}
+		const result = emitWatchdog(ctx.cwd, content);
+		// Headless writes silently (D3): the file on disk is the report.
+		if (!ctx.hasUI) return;
+		ctx.ui.notify(
+			result.besideStanding
+				? "oma: wrote WATCHDOG.oma.md beside standing WATCHDOG.md — review, then move into place"
+				: `oma: wrote WATCHDOG.md — ${kept.length} traps`,
+			"info",
+		);
+	};
+
+
 	const commandOptions = {
 		description: "Interview the project and emit its watchdogs (oma)",
-		getArgumentCompletions: (prefix: string) =>
-			prefix === "" || "scan".startsWith(prefix)
-				? [{ value: "scan", label: "scan", description: "Fan out read-only scouts; write advisor-brief.md" }]
-				: null,
+		getArgumentCompletions: (prefix: string) => {
+			const subcommands = [
+				{ value: "scan", label: "scan", description: "Fan out read-only scouts; write advisor-brief.md" },
+				{ value: "emit", label: "emit", description: "Preview and write WATCHDOG.md from kept brief candidates" },
+			];
+			const matches = subcommands.filter((s) => prefix === "" || s.value.startsWith(prefix));
+			return matches.length > 0 ? matches : null;
+		},
 		handler: async (args: string, ctx: ExtensionCommandContext): Promise<void> => {
-			if (args.trim() === "scan") return runScan(ctx);
+			const sub = args.trim();
+			if (sub === "scan") return runScan(ctx);
+			if (sub === "emit") return runEmit(ctx);
 			return runPicker(ctx);
 		},
 	};
@@ -92,10 +151,20 @@ export default function omaExtension(pi: ExtensionAPI): void {
 			ctx.ui.notify("oma: scan finished but advisor-brief.md was not written", "warning");
 			return;
 		}
-		const { candidates, skipped } = read.result;
+	const { candidates, skipped } = read.result;
+	ctx.ui.notify(
+		`oma: scan complete — ${candidates.length} candidates in advisor-brief.md${skipped ? ` (${skipped} skipped as malformed)` : ""}`,
+		"info",
+	);
+	// Liveness check: parseBrief validates grammar only — a hallucinated anchor
+	// would otherwise flow silently into the picker and the WATCHDOG emit.
+	const unanchored = verifyEvidenceAnchors(ctx.cwd, candidates);
+	if (unanchored.length > 0) {
+		const ids = unanchored.map((failure) => failure.id).join(", ");
 		ctx.ui.notify(
-			`oma: scan complete — ${candidates.length} candidates in advisor-brief.md${skipped ? ` (${skipped} skipped as malformed)` : ""}`,
-			"info",
+			`oma: warning — ${unanchored.length} candidate${unanchored.length === 1 ? "" : "s"} cite evidence that does not resolve (${ids}) — drop or rescan`,
+			"warning",
 		);
+	}
 	});
 }

@@ -1,0 +1,6 @@
+-- Canonical schema. Migrations must keep this file in sync.
+CREATE TABLE users (
+	id TEXT PRIMARY KEY,
+	email TEXT NOT NULL UNIQUE,
+	created_at INTEGER NOT NULL
+);

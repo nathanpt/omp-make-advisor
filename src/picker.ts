@@ -8,9 +8,10 @@ export interface PickerResult {
 	dropped: string[];
 }
 
-// Structural seam: the production mount passes omp's KeybindingsManager; the PTY
-// host passes a stub so app.interrupt stays a production-only concern.
-interface KeybindingsLike {
+// Structural seam: the production mount passes omp's KeybindingsManager; the
+// PTY host passes a stub so app.interrupt stays a production-only concern.
+// Shared with the preview overlay — one seam, not two.
+export interface KeybindingsLike {
 	matches(data: string, action: Keybinding): boolean;
 }
 

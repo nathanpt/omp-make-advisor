@@ -1,7 +1,10 @@
 import { test } from "bun:test";
 import assert from "node:assert/strict";
-import { briefToText, parseBrief } from "../src/brief.ts";
-import type { BriefCandidate } from "../src/brief.ts";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { briefToText, parseBrief, readEvidenceContext, verifyEvidenceAnchors } from "../src/brief.ts";
+import type { BriefCandidate, CandidateTrap } from "../src/brief.ts";
 
 const FIXTURE: readonly BriefCandidate[] = [
 	{
@@ -94,4 +97,69 @@ test("status token normalization", () => {
 test("empty and header-only text parse to nothing", () => {
 	assert.deepEqual(parseBrief(""), { candidates: [], skipped: 0 });
 	assert.deepEqual(parseBrief("# Advisor brief\n\n<!-- comment -->\n"), { candidates: [], skipped: 0 });
+});
+
+const ANCHOR_CASES: readonly CandidateTrap[] = [
+	{ id: "ok-range", title: "t", evidence: "ingest.ts:1-3" },
+	{ id: "ok-bare", title: "t", evidence: "ingest.ts" },
+	{ id: "ok-dir", title: "t", evidence: "db" },
+	{ id: "ghost", title: "t", evidence: "src/ghost.ts:10" },
+	{ id: "past-eof", title: "t", evidence: "ingest.ts:2-9" },
+	{ id: "dir-range", title: "t", evidence: "db:1-2" },
+];
+
+test("verifyEvidenceAnchors: exact-EOF ranges and bare paths pass; ghost, past-EOF, and ranged dirs fail", () => {
+	const dir = mkdtempSync(join(tmpdir(), "oma-anchors-"));
+	try {
+		writeFileSync(join(dir, "ingest.ts"), "line1\nline2\nline3"); // 3 lines
+		mkdirSync(join(dir, "db"));
+		assert.deepEqual(verifyEvidenceAnchors(dir, ANCHOR_CASES), [
+			{ id: "ghost", evidence: "src/ghost.ts:10", reason: "unresolved" },
+			{ id: "past-eof", evidence: "ingest.ts:2-9", reason: "out-of-range" },
+			{ id: "dir-range", evidence: "db:1-2", reason: "unresolved" },
+		]);
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+test("readEvidenceContext: ranges, caps, bare files, and non-file evidence", () => {
+	const dir = mkdtempSync(join(tmpdir(), "oma-evidence-"));
+	try {
+		const lines = Array.from({ length: 20 }, (_, i) => `l${i + 1}`);
+		writeFileSync(join(dir, "src.ts"), `${lines.join("\n")}\n`);
+		mkdirSync(join(dir, "db"));
+		// Range inside the cap.
+		assert.deepEqual(readEvidenceContext(dir, "src.ts:3-5"), {
+			startLine: 3,
+			lines: ["l3", "l4", "l5"],
+			more: 0,
+		});
+		// Range wider than the cap elides the tail.
+		assert.deepEqual(readEvidenceContext(dir, "src.ts:2-12"), {
+			startLine: 2,
+			lines: ["l2", "l3", "l4", "l5", "l6"],
+			more: 6,
+		});
+		// Single-line anchor.
+		assert.deepEqual(readEvidenceContext(dir, "src.ts:4"), { startLine: 4, lines: ["l4"], more: 0 });
+		// Exact-EOF range (trailing newline must not count as a line).
+		assert.deepEqual(readEvidenceContext(dir, "src.ts:18-20"), {
+			startLine: 18,
+			lines: ["l18", "l19", "l20"],
+			more: 0,
+		});
+		// Bare file path previews from the top.
+		assert.deepEqual(readEvidenceContext(dir, "src.ts"), {
+			startLine: 1,
+			lines: ["l1", "l2", "l3", "l4", "l5"],
+			more: 15,
+		});
+		// Directory (area guard), missing path, and past-EOF start: no context.
+		assert.equal(readEvidenceContext(dir, "db"), null);
+		assert.equal(readEvidenceContext(dir, "ghost.ts:1"), null);
+		assert.equal(readEvidenceContext(dir, "src.ts:99"), null);
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
 });

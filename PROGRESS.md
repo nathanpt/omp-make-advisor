@@ -1,6 +1,6 @@
 # PROGRESS
 
-Updated: 2026-09-06 (f-003 implementation session)
+Updated: 2026-09-08 (f-004 + f-005 session)
 
 ## Current repository state
 
@@ -32,11 +32,17 @@ Updated: 2026-09-06 (f-003 implementation session)
   repo exits 0 and writes a parseable brief with existing evidence paths.
 - Headless load: `omp -e ./index.ts -p …` exits 0, replies `ready`, no UI attempt.
 - PTY harness (`test/tui/`): 60-col host renders frames; accept, cancel, and preload flows pass.
+- Live self-scan (installed plugin, this repo, 2026-09-06): `/oma scan` wrote an 11-candidate
+  `advisor-brief.md`; `parseBrief` → 11 candidates, 0 skipped; all 11 evidence anchors resolve
+  with line ranges within file bounds (`verifyEvidenceAnchors` on the live brief returns `[]`).
 
 ## Active work
 
-None in flight. Next feature per selection rule: `f-004` (emit single-advisor WATCHDOG.md with
-preview screen; deps f-003 ✓).
+None in flight. f-004 (WATCHDOG.md emit with preview) and f-005 (precision
+fixtures + recorded run) are complete and passing. Next feature per selection
+rule: `f-006` (full interview stepper; deps f-003 ✓) or `f-007` (WATCHDOG.yml
+roster emission — carries the literal-block-scalar serializer semantics noted
+below).
 
 ## Blockers and unknowns
 
@@ -151,6 +157,16 @@ Resolved this session:
   dir dispatches silently (1.2s, no model turn); live PTY session in herdr-lantern via plugin
   discovery (no `-e`): `/oma scan` → start + completion notifies, 9-candidate
   advisor-brief.md written with line-ranged evidence across all four lenses.
+- Anchor-liveness hardening (2026-09-06, after first live self-scan): the settle path verified
+  grammar only — the self-scan's anchors resolved because it was checked by hand; a hallucinated
+  anchor would have flowed silently into the picker and the emit. Added
+  `verifyEvidenceAnchors(cwd, candidates)` in src/brief.ts (bare paths may be directories/area
+  guards; `path:line[-line]` anchors require a readable regular file whose line count covers the
+  range; failures carry `unresolved`/`out-of-range` reasons) plus a warning notify in `agent_end`
+  naming offending ids. Headless path unchanged (brief file remains the fallback).
+  Verification: `npm run typecheck` clean; `npm test` 8 pass (new matrix test: exact-EOF range and
+  bare dir pass, ghost path / past-EOF range / ranged dir fail with reasons); `./init.sh` green
+  (`INIT_EXIT=0`); `npm run probe` exit 0 (`ready`); live smoke on this repo's own brief → `[]`.
 - Incidents and corrections (2026-09-06):
   - **Masked test failure**: after the picker landed (f-002 commit), `npm test` under
     tsx/node began failing with `ERR_UNSUPPORTED_ESM_URL_SCHEME: Received protocol 'bun:'` —
@@ -186,11 +202,86 @@ Resolved this session:
   Kept deliberately: the `\r`→`\n` remap (Enter must accept even if `tui.select.confirm` is
   remapped; upstream mirrors this belt-and-braces), `KeybindingsLike` seam + host stub
   (interrupt stays production-only), `Bun.sleep` avoided per repo test-timer rule.
-  Verification: `npm run test:tui` ×5 runs all exit 0; typecheck/test/probe exit 0; interactive
-  PTY session confirmed the new header renders untruncated and accept/cancel flows behave.
+- f-004 + f-005 (2026-09-08, all pass):
+  - **Harness refactor**: `test/tui/hostlib.ts` extracted (`Instrumented`
+    generic over `Component`, `mountHost`); `test/tui/host.ts` rewritten on it,
+    CLI contract unchanged. `npm run test:tui` — 3 pass post-refactor (picker
+    suite; now 6 with preview suite below).
+  - **Emitter**: `src/emit.ts` (`buildWatchdogMd`, `emitWatchdog`,
+    `WATCHDOG_FILENAME`/`WATCHDOG_SIDECAR_FILENAME`);
+    `test/emit.test.ts` — golden byte-exact (kept-only filter, empty-rationale
+    form), md→brief→md round-trip identical, clobber matrix (absent → writes
+    `WATCHDOG.md`, `besideStanding:false`; standing present → sidecar, standing
+    buffer byte-identical).
+  - **Preview**: `src/preview.ts` `WatchdogPreview` (ScrollView body, height 12,
+    width-cached rebuild, done-once guard, `\r`→`\n` + literal-key
+    belt-and-braces); `KeybindingsLike` now exported from `src/picker.ts`.
+    `test/tui/preview-host.ts` + `test/tui/preview.test.ts` — apply
+    (`\r`→`done{result:true}`), cancel (`\x1b`→`done{result:null}`), scroll
+    (`\x1b[6~` PageDown reveals below-viewport marker, then confirm). 6/6 TUI
+    tests pass.
+  - **Command**: `/oma emit` (and `/make-advisor emit`) — `runEmit` mirrors
+    runPicker's ENOENT-vs-other ladder; zero-candidates and zero-kept warn
+    (UI-only); UI path previews then writes; headless writes silently (D3).
+    Completions filter `scan`+`emit` by `startsWith`. Gates: `npm run
+    typecheck` clean; `npm test` 11 pass; `npm run test:tui` 6 pass; `npm run
+    probe` exit 0 `ready`; `./init.sh` `INIT_EXIT=0`.
+  - **Live interactive PTY smoke** (hub-hosted omp 18.1.11, temp fixture repo
+    with seeded 3-candidate brief): `/oma emit` renders preview header
+    `WATCHDOG.md preview · enter write · esc cancel` + body; `\r` → notify
+    `oma: wrote WATCHDOG.md — 2 traps`, file on disk `cmp`-identical to
+    `buildWatchdogMd` output (md5 `df92fe63…`); with standing `WATCHDOG.md`
+    present, header shows `WATCHDOG.oma.md preview`, `\r` writes the sidecar,
+    standing md5 unchanged; `\x1b` → `oma: cancelled - nothing written`, no
+    file created.
+  - **f-004 step-4 interpretation** (documented per plan; step text untouched):
+    "literal block scalars / round-trip" is the `WATCHDOG.yml` serializer
+    concern (`advisor/config.ts:271-275`) and lands with f-007. For the md
+    artifact it is satisfied as byte-stable deterministic emission + golden +
+    regenerate-from-re-parsed-brief round-trip (both in `test/emit.test.ts`).
+  - **f-005 precision run** (recorded run = third; see incident below):
+    `bash test/fixtures/precision/run.sh` — 6 live headless scans (one per
+    fixture, `timeout 300`, temp scratch repos, briefs archived under
+    `test/fixtures/precision/results/`, gitignored), exit 0. Scoring (throwaway
+    bun script, not committed): `parseBrief` + `verifyEvidenceAnchors` at each
+    fixture root + case-insensitive title keywords per `expected.json`.
+
+    | fixture | kind | flagged | evidence resolved | verdict |
+    |---|---|---|---|---|
+    | conc-map | violation | yes (conc-2 `withIngestLock`, conc-3 `Map`, build-2) | 12/12 | hit |
+    | err-swallow | violation | no (no title contains swallow/auth) | 9/11 | keyword miss; substance caught (err-1, `src/auth/session.ts:14-17`) |
+    | data-drift | violation | yes (data-1/2/3) | 6/6 | hit |
+    | build-gate | violation | yes (8 candidates incl. err-1/2, build-1/3) | 9/9 | hit |
+    | clean-tidy | clean | 9 candidates, all resolving | 9/9 | false positive |
+    | clean-empty | clean | 1 candidate, resolving | 1/1 | false positive |
+
+    Findings recorded as-is (f-005 passes on the run being executed and
+    honestly logged, per pinned rule): 3/4 violations flagged with resolving
+    evidence; err-swallow's trap is caught in substance but phrased without
+    the literal expected keywords (keyword lists may need synonym widening or
+    a semantic judge — feeds the f-008 scoring-judge question); both clean
+    negatives false-positived — scouts emit defensive future-facing watch-rules
+    even on deliberately boring repos, so v1 recall is high but specificity on
+    clean trees is low (candidate count is not a cleanliness signal; the
+    keep/drop interview is the filter). err-swallow also produced 2 candidates
+    with non-conforming evidence syntax (`path (with path)`); the anchor check
+    correctly fails them at settle.
+  - **Incident — precision harness nested-copy bug**: run.sh's first copy line
+    (`cp -r "$HERE/$name" "$tmp"/.`) copied the fixture DIRECTORY into the
+    scratch repo, so scans ran one level above the intended root and evidence
+    was correctly prefixed `<name>/path…`; scoring against the fixture root
+    then showed 0 resolved everywhere. Two full morning runs were discarded
+    after two single-fixture probes (contents-at-root with de-pathed README
+    H1; contents-at-root with original H1 — both fully resolving) isolated the
+    copy line as the sole cause (README H1 exonerated). Fixed to
+    `cp -r "$HERE/$name/." "$tmp"/`; the table above is from the fixed run.
 
 ## Next useful move
 
-Start `f-004`: emit a single-advisor `WATCHDOG.md` with a preview screen — Enter applies (writes
-beside standing files), Esc reverts (deps: f-003 ✓). The brief's kept candidates are the input;
-serializer must mirror OMP advisor semantics per DESIGN.md.
+Start `f-006` (full interview stepper: per-trap evidence inline, progress bar,
+keep/edit/drop with free-text edit; deps f-003 ✓) — `WatchdogPreview` +
+f-004 step 4). The precision run also sharpened f-008: clean-repo specificity
+and keyword-vs-judge scoring are the two measured gaps. Carried from the
+self-scan (still true): f-009's staleness signal is precisely
+`verifyEvidenceAnchors` reuse at picker/doctor time — evidence line-ranges
+that no longer resolve.
