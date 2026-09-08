@@ -14,7 +14,8 @@
     "test": "bun test test/*.test.ts",
     "test:tui": "bun test test/tui/",
     "probe": "omp -e ./index.ts -p \"reply with the single word ready\"",
-    "test:e2e": "OMA_E2E=1 bun test test/e2e/"
+    "test:e2e": "OMA_E2E=1 bun test test/e2e/",
+    "gallery": "bun run scripts/gallery.ts"
   },
   "peerDependencies": {
     "@oh-my-pi/pi-coding-agent": ">=18.0.0"

@@ -30,7 +30,8 @@ test("walkthrough: list renders rows + totals, enter opens detail, esc walks bac
 	try {
 		const events = await host.waitUntil((es) => es.some((e) => (e as Event).type === "frame"));
 		// List: header, all three row archetypes, footer totals.
-		const list = frameWith(events, "oma precision report · enter detail · esc close");
+		const list = frameWith(events, "oma precision report");
+		frameWith(events, "enter detail · esc close");
 		frameWith(events, "conc-map · flagged · keep");
 		frameWith(events, "clean-tidy · noise · retune");
 		frameWith(events, "data-drift · no transcript · drop");
@@ -40,9 +41,9 @@ test("walkthrough: list renders rows + totals, enter opens detail, esc walks bac
 		// advise note, keywords vs hits, cost/model.
 		host.write("\r");
 		const detailEvents = await host.waitUntil((es) =>
-			framesOf(es).some((f) => f.lines.some((line) => plain(line).includes("conc-map · enter back · esc close"))),
+			framesOf(es).some((f) => f.lines.some((line) => plain(line).includes("enter back · esc close"))),
 		);
-		const detail = frameWith(detailEvents, "conc-map · enter back · esc close");
+		const detail = frameWith(detailEvents, "enter back · esc close");
 		assert.ok(frameIndex(detailEvents, detail) > frameIndex(detailEvents, list), "detail must render after the list");
 		frameWith(detailEvents, "- [concern] (concurrency-watcher) batchIndex.delete runs");
 		frameWith(detailEvents, "outside withIngestLock");
@@ -52,10 +53,10 @@ test("walkthrough: list renders rows + totals, enter opens detail, esc walks bac
 		// Esc returns to the list (a fresh list frame after the detail).
 		host.write("\x1b");
 		const backEvents = await host.waitUntil(
-			(es) => framesOf(es).filter((f) => f.lines.some((line) => plain(line).includes("oma precision report · enter detail · esc close"))).length > 1,
+			(es) => framesOf(es).filter((f) => f.lines.some((line) => plain(line).includes("oma precision report"))).length > 1,
 		);
 		const backFrame = framesOf(backEvents).filter((f) =>
-			f.lines.some((line) => plain(line).includes("oma precision report · enter detail · esc close")),
+			f.lines.some((line) => plain(line).includes("oma precision report")),
 		).pop()!;
 		assert.ok(frameIndex(backEvents, backFrame) > frameIndex(backEvents, detail), "list must return after the detail");
 

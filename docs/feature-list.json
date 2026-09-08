@@ -173,7 +173,7 @@
         "Snapshot tests updated to the new frames"
       ],
       "passes": false,
-      "evidence": null,
+      "evidence": "Steps 1, 2, 4 pass: scripts/gallery.ts (npm run gallery) renders hub/report-list/report-detail at widths 60+80; src/frame.ts frame() + FrameTheme (real uiTheme via ctx.ui.custom in production, PLAIN_FRAME_THEME fallback in hosts) frames hub + report list + report detail with title/footer rows, OMP-native rounded Box look; test/tui hub+report snapshot tests updated to framed layout (13 TUI pass), live PTY smoke showed the framed hub with real theme colors over omp 18.1.14 welcome screen; gates green (28 unit, init.sh All checks passed, probe ready). Step 3 (Markdown rendering for rule/advise panes) DEFERRED with cause: pi-tui Markdown requires a MarkdownTheme and getMarkdownTheme() dereferences OMP's global theme unguarded — throws in PTY hosts where no theme is initialized. Unblock options recorded in PROGRESS f-011: initialize theme in hosts (initThemeSync) or inject a MarkdownTheme; revisit with the interview/preview restyle. NOT marked passing — step 3 unmet.",
       "priority": 11,
       "dependencies": ["f-010"],
       "source": "DESIGN.md §10 Next; user design session 2026-09-08"

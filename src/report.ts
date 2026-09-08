@@ -1,5 +1,6 @@
-import { ScrollView, SelectList, replaceTabs, truncateToWidth, wrapTextWithAnsi } from "@oh-my-pi/pi-tui";
+import { Box, ScrollView, SelectList, replaceTabs, wrapTextWithAnsi } from "@oh-my-pi/pi-tui";
 import type { Component } from "@oh-my-pi/pi-tui";
+import { PLAIN_FRAME_THEME, frame, type FrameTheme } from "./frame.js";
 import { getSelectListTheme } from "@oh-my-pi/pi-coding-agent";
 import type { KeybindingsLike } from "./keybindings.js";
 import type { FixtureResult, ValidateReport } from "./validate.js";
@@ -25,7 +26,9 @@ function statusLine(fixture: FixtureResult): string {
 export class ReportScreen implements Component {
 	private readonly list: SelectList;
 	private readonly scrollView = new ScrollView([], { height: BODY_HEIGHT });
+	private readonly listFrame: Box;
 	private detail: FixtureResult | null = null;
+	private detailFrame: Box | null = null;
 	private lastDetailWidth: number | null = null;
 	private doneCalled = false;
 
@@ -33,6 +36,7 @@ export class ReportScreen implements Component {
 		private readonly report: ValidateReport,
 		private readonly keybindings: KeybindingsLike,
 		private readonly done: (result: boolean | undefined) => void,
+		private readonly theme: FrameTheme = PLAIN_FRAME_THEME,
 	) {
 		const items = this.report.fixtures.map((fixture) => ({
 			value: fixture.name,
@@ -44,10 +48,23 @@ export class ReportScreen implements Component {
 			if (fixture) this.openDetail(fixture);
 		};
 		this.list.onCancel = () => this.finish(false);
+		this.listFrame = frame(this.theme, {
+			title: "oma precision report",
+			body: this.list,
+			footer: [
+				`advisors $${this.report.totalCostUsd.toFixed(4)} · keep ${this.report.totals.keep} · retune ${this.report.totals.retune} · drop ${this.report.totals.drop}`,
+				"enter detail · esc close",
+			],
+		});
 	}
 
 	private openDetail(fixture: FixtureResult): void {
 		this.detail = fixture;
+		this.detailFrame = frame(this.theme, {
+			title: `${fixture.name} · ${statusLine(fixture)} · ${fixture.verdict}`,
+			body: this.scrollView,
+			footer: ["enter back · esc close"],
+		});
 		this.lastDetailWidth = null; // force the pane rebuild on next render
 	}
 
@@ -56,6 +73,7 @@ export class ReportScreen implements Component {
 		this.doneCalled = true;
 		this.done(result);
 	}
+
 
 	handleInput(data: string): void {
 		// Honor remapped interrupt keys.
@@ -84,39 +102,38 @@ export class ReportScreen implements Component {
 
 	render(width: number): readonly string[] {
 		const safeWidth = Math.max(1, width);
-		if (this.detail !== null) {
+		if (this.detail !== null && this.detailFrame !== null) {
 			const fixture = this.detail;
-			if (this.lastDetailWidth !== safeWidth) {
-				this.lastDetailWidth = safeWidth;
+			// Frame border + padding eat 4 columns; wrap body text to the
+			// scroll viewport, not the outer width.
+			const innerWidth = Math.max(1, safeWidth - 4);
+			if (this.lastDetailWidth !== innerWidth) {
+				this.lastDetailWidth = innerWidth;
 				const rows: string[] = [];
 				for (const advise of fixture.advises) {
-					rows.push(...wrapTextWithAnsi(replaceTabs(`- [${advise.severity}] (${advise.slug}) ${advise.note}`), safeWidth));
+					rows.push(...wrapTextWithAnsi(replaceTabs(`- [${advise.severity}] (${advise.slug}) ${advise.note}`), innerWidth));
 				}
 				const keywords = fixture.keywords.join(", ") || "—";
 				const hits = fixture.hits.join(", ") || "—";
-				rows.push(...wrapTextWithAnsi(replaceTabs(`keywords: ${keywords} · hits: ${hits}`), safeWidth));
+				rows.push(...wrapTextWithAnsi(replaceTabs(`keywords: ${keywords} · hits: ${hits}`), innerWidth));
 				rows.push(
 					...wrapTextWithAnsi(
 						replaceTabs(`cost $${fixture.costUsd.toFixed(4)} · model ${fixture.models.join(", ") || "—"}`),
-						safeWidth,
+						innerWidth,
 					),
 				);
 				this.scrollView.setLines(rows);
 			}
-			const header = truncateToWidth(`${fixture.name} · enter back · esc close`, safeWidth);
-			return [header, ...this.scrollView.render(safeWidth)];
+			return this.detailFrame.render(safeWidth);
 		}
-		const header = truncateToWidth("oma precision report · enter detail · esc close", safeWidth);
-		const footer = truncateToWidth(
-			`advisors $${this.report.totalCostUsd.toFixed(4)} · keep ${this.report.totals.keep} · retune ${this.report.totals.retune} · drop ${this.report.totals.drop}`,
-			safeWidth,
-		);
-		return [header, ...this.list.render(safeWidth), footer];
+		return this.listFrame.render(safeWidth);
 	}
 
 	invalidate(): void {
 		this.list.invalidate?.();
 		this.scrollView.invalidate();
+		this.listFrame.invalidate();
+		this.detailFrame?.invalidate();
 	}
 
 	dispose(): void {}

@@ -26,7 +26,8 @@ test("hub: header, four status rows, footer; enter dispatches scan; esc cancels 
 	const host = spawnHost("hub-host.ts");
 	try {
 		const events = await host.waitUntil((es) => es.some((e) => (e as Event).type === "frame"));
-		frameWith(events, "oma · demo · enter open · esc close");
+		frameWith(events, "oma · demo");
+		frameWith(events, "enter open · esc close");
 		frameWith(events, "scan");
 		frameWith(events, "✓ advisor-brief · 6");
 		frameWith(events, "✓ 4 of 6 kept");

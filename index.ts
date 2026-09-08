@@ -98,7 +98,7 @@ export default function omaExtension(pi: ExtensionAPI): void {
 			return;
 		}
 		const action = await ctx.ui.custom<HubAction | undefined>(
-			(_tui, _theme, keybindings, done) => new HubScreen(status, keybindings, done),
+			(_tui, theme, keybindings, done) => new HubScreen(status, keybindings, done, theme),
 			{ overlay: true },
 		);
 		if (action === "scan") return runScan(ctx);
@@ -191,7 +191,7 @@ export default function omaExtension(pi: ExtensionAPI): void {
 		}
 		if (ctx.hasUI) {
 			await ctx.ui.custom<boolean | undefined>(
-				(_tui, _theme, keybindings, done) => new ReportScreen(report, keybindings, done),
+				(_tui, theme, keybindings, done) => new ReportScreen(report, keybindings, done, theme),
 				{ overlay: true },
 			);
 			return;

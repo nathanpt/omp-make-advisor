@@ -1,7 +1,10 @@
 import { existsSync, readFileSync } from "node:fs";
 import { basename, join } from "node:path";
-import { SelectList, truncateToWidth } from "@oh-my-pi/pi-tui";
+import { Box, SelectList } from "@oh-my-pi/pi-tui";
+import { PLAIN_FRAME_THEME, frame, type FrameTheme } from "./frame.js";
 import type { Component } from "@oh-my-pi/pi-tui";
+import type { KeybindingsLike } from "./keybindings.js";
+import type { ValidateReport } from "./validate.js";
 import { getSelectListTheme } from "@oh-my-pi/pi-coding-agent";
 import { readBrief } from "./brief.js";
 import {
@@ -10,8 +13,6 @@ import {
 	WATCHDOG_YML_FILENAME,
 	WATCHDOG_YML_SIDECAR_FILENAME,
 } from "./emit.js";
-import type { KeybindingsLike } from "./keybindings.js";
-import type { ValidateReport } from "./validate.js";
 
 // ADR-0002: bare `/oma` opens a status hub. The status model is pure
 // filesystem truth (brief, watchdog pair, dev report) so f-009's doctor can
@@ -99,12 +100,14 @@ export type HubAction = "scan" | "interview" | "emit" | "validate";
 // itself; Enter simply dispatches.
 export class HubScreen implements Component {
 	private readonly list: SelectList;
+	private readonly frame: Box;
 	private doneCalled = false;
 
 	constructor(
 		private readonly status: HubStatus,
 		private readonly keybindings: KeybindingsLike,
 		private readonly done: (result: HubAction | undefined) => void,
+		private readonly theme: FrameTheme = PLAIN_FRAME_THEME,
 	) {
 		const items = [
 			{ value: "scan", label: "scan", description: scanDescription(status) },
@@ -115,6 +118,11 @@ export class HubScreen implements Component {
 		this.list = new SelectList(items, items.length, getSelectListTheme(), { overflowSearch: false });
 		this.list.onSelect = (item) => this.finish(item.value as HubAction);
 		this.list.onCancel = () => this.finish(undefined);
+		this.frame = frame(this.theme, {
+			title: `oma · ${status.project}`,
+			body: this.list,
+			footer: ["flow: scan → interview → emit → /advisor on", "enter open · esc close"],
+		});
 	}
 
 	private finish(result: HubAction | undefined): void {
@@ -132,14 +140,12 @@ export class HubScreen implements Component {
 	}
 
 	render(width: number): readonly string[] {
-		const safeWidth = Math.max(1, width);
-		const header = truncateToWidth(`oma · ${this.status.project} · enter open · esc close`, safeWidth);
-		const footer = truncateToWidth("flow: scan → interview → emit → /advisor on", safeWidth);
-		return [header, ...this.list.render(safeWidth), footer];
+		return this.frame.render(Math.max(1, width));
 	}
 
 	invalidate(): void {
 		this.list.invalidate?.();
+		this.frame.invalidate();
 	}
 
 	dispose(): void {}

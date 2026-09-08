@@ -1,13 +1,13 @@
 # PROGRESS
 
-Updated: 2026-09-08 (f-010 hub session)
+Updated: 2026-09-08 (f-011 visual pass session)
 
 ## Current repository state
 
-- Git repository initialized (`main`); twenty-one commits through the f-010 hub (foundation
+- Git repository initialized (`main`); twenty-two commits through the f-011 visual pass (foundation
   docs → package scaffold → f-001..f-003 slices → install-manifest fix → f-004/f-005
   emit+preview+precision → f-006 stepper + cutover → f-007 emit + simplify pass → f-008 probe
-  → f-008 validator + scored report → f-010 status hub + routing).
+  → f-008 validator + scored report → f-010 status hub + routing → f-011 boxed frames + gallery).
 - Slices 1–4 complete and passing: `/oma scan` fans out the 4-lens scouts into
   `advisor-brief.md`; bare `/oma` opens the **status hub** (f-010, ADR-0002) — one row per
   stage with live state; `/oma interview` opens the **interview stepper** — one trap per screen with
@@ -27,6 +27,10 @@ Updated: 2026-09-08 (f-010 hub session)
   Enter dispatches to the stage handler, Esc closes. `/oma interview` is the stepper's new
   explicit name; headless `/oma` prints the summary + next action. The status model
   (`src/hub.ts readHubStatus`) is pure fs truth — the seed of the f-009 doctor engine.
+- f-011: oma's hub + report surfaces render in rounded `Box` frames (OMP-native look) via
+  `src/frame.ts` (`frame()` + `FrameTheme` — real uiTheme in production, `PLAIN_FRAME_THEME`
+  in tests/gallery); `npm run gallery` renders every styled screen at widths 60/80 for design
+  iteration without launching omp.
 - Toolchain: npm + node ≥22 + `tsc --noEmit`; **bun runs both test suites** (`npm test`,
   `npm run test:tui`); no build step (`omp -e index.ts` loads TS directly). devDeps
   `@oh-my-pi/pi-coding-agent`/`-pi-tui` 18.1.12 vs omp runtime now **18.1.14** (was 18.1.11
@@ -59,9 +63,8 @@ Updated: 2026-09-08 (f-010 hub session)
 
 ## Active work
 
-None in flight. f-010 (hub + routing) is complete and passing. Next per selection rule:
-`f-009` (doctor staleness nudge; deps f-004 ✓) — its detection feeds hub rows — then
-`f-011` (boxed visual pass + render gallery).
+None in flight. f-010 (hub + routing) and f-011 (visual pass) are complete and passing. Next
+per selection rule: `f-009` (doctor staleness nudge; deps f-004 ✓) — its detection feeds hub rows.
 
 
 ## Blockers and unknowns
@@ -609,9 +612,8 @@ Resolved this session:
 Start `f-009` (doctor staleness nudge; deps f-004 ✓). The detection engine is now
 `readHubStatus` — extend it with the staleness signal (`verifyEvidenceAnchors` reuse at
 interview/doctor time per the carried note) and surface warning rows in the hub. Headless
-variant per constraint 3. After that: `f-011` (visual pass — pi-tui Box frames, status
-glyphs, markdown detail panes, and the render-gallery script for design iteration; OMP-native
-boxed look per the 2026-09-08 design session).
+variant per constraint 3. `f-011` (visual pass) is done — its gallery (`npm run gallery`)
+remains the tool for further styling experiments.
 
 - f-008 probe (2026-09-08, live): conc-map fixture + emitted WATCHDOG pair;
   `timeout 300 omp -p --advisor --auto-approve "add dropBatch() deleting from batchIndex"`.
@@ -627,5 +629,36 @@ boxed look per the 2026-09-08 design session).
   reviews (30s error budget) — our reviews completed well inside it; (6) `--auto-approve`
   required for unattended edits. Probe session retained at
   `~/.omp/agent/sessions/-tmp-tmp.CLnrjvHMMH/2026-09-08T19-20-29-*`.
+- f-011 (2026-09-08, all pass) — visual pass: boxed frames + render gallery:
+  - **Framework decision (no ADR needed)**: pi-tui stays — ratatui is Rust and would mean a
+    sidecar binary (rejected by ADR-0001); oma renders in-process via `ctx.ui.custom`, and
+    pi-tui already ships `Box`/`Text`/symbol themes. The OMP-native look (rounded borders,
+    title/footer rows inside the frame) is the house pattern (welcome screen, skill cards,
+    bash-interactive box).
+  - **`src/frame.ts`**: `FrameTheme` (structural slice of OMP's Theme: `boxRound` glyphs +
+    `fg(borderMuted|borderAccent|dim)`), `PLAIN_FRAME_THEME` fallback (same glyphs, no ANSI —
+    keeps hosts deterministic), and `frame(theme, {title, body, footer[]}) → Box`. Screens
+    take `theme` as an optional last ctor param; production factories pass the real uiTheme
+    from `ctx.ui.custom` (index.ts). Nav stays SelectList (constraint 4) — the frame is
+    chrome only.
+  - **HubScreen**: framed — title `oma · <project>`, body = stage rows, footer = flow line +
+    `enter open · esc close`. **ReportScreen**: list framed with title `oma precision report`
+    + totals footer; detail rebuilt as a frame per openDetail (title `name · status · verdict`,
+    body = ScrollView wrapped at innerWidth = width−4 to match the frame interior, footer
+    `enter back · esc close`). Markdown component considered and deferred: it needs an
+    initialized `MarkdownTheme` (global theme absent in test hosts) — revisit if/when detail
+    panes need real typography.
+  - **Gallery** (`scripts/gallery.ts`, `npm run gallery`): renders hub / report list / report
+    detail at widths 60 and 80 with fixed fixture data — no PTY, plain theme, diffable. This
+    is the design-iteration surface: change layout in src, run gallery, then pin via the PTY
+    snapshot tests.
+  - Tests updated to the framed layout (headers split into title + footer assertions; detail
+    detection keyed on the footer `enter back · esc close`, unique to the detail frame).
+  - Live smoke (hub-hosted omp 18.1.14, seeded repo): `/oma` → framed hub overlay composited
+    over the welcome screen with real theme colors, all four rows showing true state; Esc
+    closed cleanly.
+  - Gates: `npm run typecheck` clean; `npm test` **28 pass**; `npm run test:tui` **13 pass**;
+    `./init.sh` `All checks passed.`; `npm run probe` exit 0 `ready`.
+
 Carried (still true): f-009's staleness signal is `verifyEvidenceAnchors` reuse at
 interview/doctor time.
