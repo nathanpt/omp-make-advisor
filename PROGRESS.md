@@ -1,6 +1,6 @@
 # PROGRESS
 
-Updated: 2026-09-08 (f-006 session)
+Updated: 2026-09-08 (f-007 session)
 
 ## Current repository state
 
@@ -11,13 +11,16 @@ Updated: 2026-09-08 (f-006 session)
   `advisor-brief.md`; bare `/oma` opens the **interview stepper** — one trap per screen with
   inline evidence lines, `3/12` progress bar, keep/edit/drop via SelectList, and a free-text
   edit screen (pi-tui `Input`) whose saved title round-trips into the brief; `/oma emit`
-  previews and writes `WATCHDOG.md`. `src/picker.ts` is deleted — the stepper superseded the
-  batch picker (DESIGN.md §2 names the stepper as THE interview surface; accept/cancel/preload
-  contracts migrated to `test/tui/interview.test.ts`; f-002 evidence annotated as superseded).
+  previews and writes the `WATCHDOG.md` + `WATCHDOG.yml` roster pair (f-007). `src/picker.ts` is
+  deleted — the stepper superseded the batch picker (DESIGN.md §2 names the stepper as THE
+  interview surface; accept/cancel/preload contracts migrated to `test/tui/interview.test.ts`;
+  f-002 evidence annotated as superseded).
 - Toolchain: npm + node ≥22 + `tsc --noEmit`; **bun runs both test suites** (`npm test`,
   `npm run test:tui`); no build step (`omp -e index.ts` loads TS directly). devDeps
   `@oh-my-pi/pi-coding-agent`/`-pi-tui` 18.1.12 vs omp runtime now **18.1.14** (was 18.1.11
-  at f-003) — all f-006 flows verified green on 18.1.14; no drift observed.
+  at f-003) — all f-006 flows verified green on 18.1.14; no drift observed. f-007 added
+  `@types/bun` ^1.4.2 (types the `bun` builtin import in `src/advisor-yaml.ts`).
+
 
 
 ## Confirmed working surfaces
@@ -44,9 +47,8 @@ Updated: 2026-09-08 (f-006 session)
 
 ## Active work
 
-None in flight. f-006 is complete and passing. Next feature per selection rule: `f-007`
-(WATCHDOG.yml roster emission — deps f-004 ✓; carries the literal-block-scalar serializer
-semantics from `advisor/config.ts`). f-008 stays blocked on f-007.
+None in flight. f-007 is complete and passing. Next feature per selection rule: `f-008`
+(automated validator + scored report; deps f-005 ✓, f-007 ✓).
 
 
 ## Blockers and unknowns
@@ -368,11 +370,114 @@ Resolved this session:
   unresolved (zero false positives; f-009's staleness signal firing on real data —
   rescan or drop conc-3 when next touching the brief).
 
+- f-007 (2026-09-08, all pass):
+  - **Roster emission**: `src/emit.ts` gains `WATCHDOG_YML_FILENAME`/`WATCHDOG_YML_SIDECAR_FILENAME`
+    (`.oma.yml` sidecar), `buildRosterDoc` (kept candidates grouped by lens id prefix → one
+    advisor per present lens, top 3 by kept count, `LENS_ORDER` breaks ties via stable sort;
+    no lens ids → single fallback `Trap Watcher`; each advisor `model: "@slow"`, `tools:
+    [read, grep, glob]`, no `enabled` key), `buildWatchdogYml` (composes the vendored
+    serializer over the doc; `index.ts` calls `serializeAdvisorConfig` directly for the
+    single-build count path).
+    `watchdogTargetName`/`emitWatchdog` generalized to `besideTarget(cwd, canonical,
+    sidecar)`/`emitBeside(…)` (clean cutover, all callers migrated — f-006 simplify pass's
+    `watchdogTargetName` export superseded). `index.ts` `runEmit`: md preview → yml preview
+    (Esc on either cancels everything, nothing written), then md-then-yml writes; combined
+    notify `oma: wrote WATCHDOG.md + WATCHDOG.yml — N traps, M advisors — enable with
+    /advisor on` (sidecar case names the actual written pair); `emit` completion description
+    updated; headless writes both silently (D3 unchanged).
+  - **Discovery — omp extension loader resolves unbundled bare imports from the session cwd**
+    (load-bearing for every future slice): omp's `legacy-pi-compat` graph rewrite maps only
+    its bundled specifier keys (`@oh-my-pi/pi-coding-agent` root + listed subpaths — NOT
+    `advisor/*`, NOT `@oh-my-pi/omptype`) and resolves everything else against cwd
+    node_modules. The plan's runtime import of `@oh-my-pi/pi-coding-agent/advisor/config`
+    therefore failed from any cwd without our node_modules — static AND dynamic (`await
+    import`, which the graph rewrite still tags `?mtime=`, moving the failure into
+    `config.ts`'s own `omptype` import) — with `Cannot find package '@oh-my-pi/omptype'`.
+    `npm run probe` passed throughout because cwd == repo; the *installed* plugin
+    (`~/.omp/plugins` link) was broken everywhere until this fix. Resolution: serializer
+    **vendored verbatim** into `src/advisor-yaml.ts` (`appendYamlString` +
+    `serializeWatchdogConfig` from pi-coding-agent 18.1.12; only import is `YAML` from
+    `bun` — the same encoder OMP itself calls), with byte-equivalence pinned by tests
+    against OMP's real `serializeWatchdogConfig` (chomp edges `|2`/`|2-`/`|2+`, empty
+    `tools: []`, `enabled`, quoting). DESIGN.md §2's "reuse OMP's own serializer semantics"
+    holds (verbatim copy + enforced equivalence); plan's runtime-reuse mechanism recorded
+    as deviated. **Rule: extension runtime code may only import omp bundled-map packages
+    (`@oh-my-pi/pi-coding-agent` root, `@oh-my-pi/pi-tui`), relative files, and bun/node
+    builtins; type-only imports of anything are fine (erased).**
+  - Plan deviations (recorded): (a) runtime serializer import → vendored copy (above);
+    (b) roster "dropped excluded" test drops BOTH conc candidates — the plan's fixture text
+    ("conc-2 dropped") cannot produce its own pinned expected output `[Error Handling,
+    Data Drift, Build Gate]` (conc-1 kept alone still ties into the top 3); expected output
+    treated as contract; (c) golden pins `|2-` literal blocks (strip chomp, no trailing
+    newline) — plan's "`|2`" was loose prose; serializer source line 288 confirms.
+  - Tests: `test/emit.test.ts` — md golden + md round-trip (migrated to `emitBeside`/
+    `besideTarget`), yml golden (pinned exact string; reviewed before committing: key order
+    name → model → tools → instructions, quoted `"@slow"`, top-level `instructions:` first,
+    single trailing newline), yml round-trip through OMP's real `loadWatchdogConfigFile` →
+    `serializeWatchdogConfig` byte-identical, vendored-vs-OMP serializer equivalence on
+    edge docs, `emitBeside` clobber matrix over both md and yml pairs.
+    `test/roster.test.ts` — ranking (count desc, LENS_ORDER ties, cap 3), dropped-lens
+    exclusion, fallback `Trap Watcher`, and the f-007 step-1 discovery-walk validation
+    (`mkdtemp` project dir + empty temp `agentDir`; names in order, `@slow`, read/grep/glob,
+    attribution in `sharedInstructions`).
+  - Gates: `npm run typecheck` clean; `npm test` **19 pass**; `npm run test:tui` 10 pass;
+    `npm run probe` exit 0 `ready`; `./init.sh` `All checks passed.` (all exit codes unpiped).
+  - Headless new-behavior proof (temp dir, seeded 3-candidate brief conc-1/err-1 keep,
+    data-1 drop): `omp -e <repo>/index.ts -p "/oma emit"` exit 0; `WATCHDOG.md` lists the 2
+    kept traps; `WATCHDOG.yml` discovery (bun, absolute-path import, empty agentDir) yields
+    exactly `[Concurrency Watcher, Error Handling Watcher]` + attribution; re-run with
+    standing files → `WATCHDOG.oma.md`/`WATCHDOG.oma.yml` sidecars, standing md5s
+    byte-identical (`90479f83…`/`f3f101ed…` — identical across headless and PTY runs).
+  - Live PTY smoke (hub-hosted omp 18.1.14, fixture repo): `/oma emit` → header
+    `WATCHDOG.md preview · enter write · esc cancel` → Enter → `WATCHDOG.yml preview` →
+    Enter → toast `oma: wrote WATCHDOG.md + WATCHDOG.yml — 2 traps, 2 advisors — enable
+    with /advisor on`, both files on disk; standing-file re-run → `WATCHDOG.oma.md
+    preview` + `WATCHDOG.oma.yml preview` headers, sidecar toast `oma: wrote
+    WATCHDOG.oma.md + WATCHDOG.oma.yml beside standing files — review, then move into
+    place — enable with /advisor on`, standing md5s unchanged; third run Esc on the yml
+    preview → `oma: cancelled - nothing written`, all four md5s unchanged, no new files.
+
+- Simplify pass (2026-09-08, post-f-007): three read-only reviewer lanes (reuse; quality;
+  efficiency) over the uncommitted f-007 diff. Applied:
+  - Re-indented the runEmit block the f-007 edit had landed one tab shallow of its
+    siblings (introduced by the session's own edit, caught by review).
+  - Mixed sidecar toast fixed: `||` routed the md-standing/yml-fresh case (every f-004
+    upgrader) into the both-sidecar message, telling the user to "move into place" a
+    WATCHDOG.yml already at its canonical path. Now the both-standing guidance gates on
+    `&&`; other cases render the counts form with `(beside standing)` annotated per
+    sidecar name. Both-absent toast is byte-identical to the PTY-verified text.
+  - Notify names derive from `basename(emitBeside result.path)` — third copy of the
+    standing→name mapping removed; notify reports post-write truth.
+  - Deleted the weightless `serializeRosterDoc` alias; `buildWatchdogYml` composes
+    `serializeAdvisorConfig` directly and `index.ts` imports the vendored serializer
+    (one name chain, not three).
+  - Lens ids now a `Lens` union: `LENS_ORDER: readonly Lens[]`, `LENS_ROLES:
+    Record<Lens, …>` (missing-entry became a compile error), `LENS_PREFIX` derived from
+    `LENS_ORDER` (regex can't drift from the ranking set).
+  - `besideTarget` doc comment corrected (notify derives from emitBeside's result, not
+    besideTarget); vendored-file header now names the export rename
+    (`serializeAdvisorConfig` vs upstream) and why; roster.test.ts uses
+    `WATCHDOG_YML_FILENAME` instead of a hardcoded string; PROGRESS @types/bun version
+    corrected to ^1.4.2 (effective state).
+  Rejected: merging runInterview/runEmit brief-read guard prologues (recorded rejection
+  from the post-f-006 pass stands — headless behaviors genuinely differ); extracting a
+  kept-filter helper (weightless one-expression predicate ×4); shared withTempDir test
+  helper (repo inline convention); `wx`-flag atomic write in emitBeside (residual
+  stat→write TOCTOU window is microseconds with bounded regeneration consequence;
+  documented write-time re-check is the standard idiom — deferred hardening); merging
+  the two cancel branches (explicitness); a canonical/sidecar pair type (two constants,
+  no growth path); renaming the vendored export to the upstream name (would shadow OMP's
+  real export in the equivalence pin test — header note instead).
+  Verification: `npm run typecheck` clean; `npm test` 19 pass; `npm run probe` exit 0
+  `ready`; `./init.sh` `All checks passed.`; PTY re-smoke of the changed toast surface
+  (both-absent byte-identical, mixed md-standing shows the annotated counts form, yml
+  written canonical, md sidecar only).
+
 ## Next useful move
 
-Start `f-007` (WATCHDOG.yml roster emission: 2-3 starter roles with model/tool suggestions,
-validating against OMP's advisor discovery walk and serializer semantics; deps f-004 ✓).
-The emit-beside discipline and golden-test pattern from f-004 apply unchanged;
-`readEvidenceContext` already demonstrates the anchor-grammar reuse the discovery
-validation needs. Carried (still true): f-009's staleness signal is
-`verifyEvidenceAnchors` reuse at interview/doctor time.
+Start `f-008` (automated validator + scored report; deps f-005 ✓, f-007 ✓). Open question
+carried from §11: whether `omp -p --advisor` exposes drain/dump semantics sufficient for
+unattended scoring — probe before building. The f-005 precision harness
+(`test/fixtures/precision/`) is the fixture source; f-005 findings (clean-tree false
+positives, keyword-miss on err-swallow) set the scoring-judge bar. Carried (still true):
+f-009's staleness signal is `verifyEvidenceAnchors` reuse at interview/doctor time.

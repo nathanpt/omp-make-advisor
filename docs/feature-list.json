@@ -110,8 +110,8 @@
         "Round-trip safe against OMP's config serializer semantics",
         "Golden test for the emitted YAML"
       ],
-      "passes": false,
-      "evidence": null,
+      "passes": true,
+      "evidence": "test/roster.test.ts discovery walk (discoverAdvisorConfigs on emitted WATCHDOG.yml: names in order, @slow model, read/grep/glob tools, attribution in sharedInstructions); test/emit.test.ts golden (key order name→model→tools→instructions, quoted \"@slow\", |2- literal blocks, single trailing newline) + round-trip (loadWatchdogConfigFile→serialize byte-identical) + vendored-vs-OMP serializer equivalence on chomp/tool/enabled edges; headless omp -p '/oma emit' in temp dir wrote both files, discovery spot-check exact, sidecar re-run byte-identical; live PTY: dual preview headers, toast 'oma: wrote WATCHDOG.md + WATCHDOG.yml — 2 traps, 2 advisors — enable with /advisor on', sidecar names on standing files, Esc on yml preview cancels with nothing written; typecheck/probe/test:tui/init.sh green",
       "priority": 7,
       "dependencies": ["f-004"],
       "source": "DESIGN.md §10 Next item 2"

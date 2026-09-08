@@ -1,8 +1,19 @@
+import { basename } from "node:path";
 import type { ExtensionAPI, ExtensionCommandContext } from "@oh-my-pi/pi-coding-agent";
+import { serializeAdvisorConfig } from "./src/advisor-yaml.js";
 import { InterviewStepper, type InterviewDecision } from "./src/interview.js";
 import { readBrief, verifyEvidenceAnchors, writeBrief, readEvidenceContext } from "./src/brief.js";
 import { buildScanPrompt } from "./src/scan.js";
-import { buildWatchdogMd, emitWatchdog, watchdogTargetName, WATCHDOG_FILENAME, WATCHDOG_SIDECAR_FILENAME } from "./src/emit.js";
+import {
+	besideTarget,
+	buildRosterDoc,
+	buildWatchdogMd,
+	emitBeside,
+	WATCHDOG_FILENAME,
+	WATCHDOG_SIDECAR_FILENAME,
+	WATCHDOG_YML_FILENAME,
+	WATCHDOG_YML_SIDECAR_FILENAME,
+} from "./src/emit.js";
 import { WatchdogPreview } from "./src/preview.js";
 
 export default function omaExtension(pi: ExtensionAPI): void {
@@ -97,26 +108,38 @@ export default function omaExtension(pi: ExtensionAPI): void {
 			return;
 		}
 		const content = buildWatchdogMd(candidates);
-		// The header names the file emitWatchdog will actually write;
-		// emitWatchdog's own existsSync stays authoritative at write time.
-		const targetName = watchdogTargetName(ctx.cwd);
+		const rosterDoc = buildRosterDoc(candidates);
+		const roster = serializeAdvisorConfig(rosterDoc);
 		if (ctx.hasUI) {
-			const apply = await ctx.ui.custom<boolean | undefined>(
-				(_tui, _theme, keybindings, done) => new WatchdogPreview(content, targetName, keybindings, done),
-				{ overlay: true },
-			);
-			if (!apply) {
+			// Headers name the files emitBeside will actually write; emitBeside's
+			// own existsSync stays authoritative at write time. Esc on either
+			// preview cancels everything — nothing is written.
+			const preview = (text: string, targetName: string) =>
+				ctx.ui.custom<boolean | undefined>(
+					(_tui, _theme, keybindings, done) => new WatchdogPreview(text, targetName, keybindings, done),
+					{ overlay: true },
+				);
+			if (!(await preview(content, besideTarget(ctx.cwd, WATCHDOG_FILENAME, WATCHDOG_SIDECAR_FILENAME)))) {
+				ctx.ui.notify("oma: cancelled - nothing written", "info");
+				return;
+			}
+			if (!(await preview(roster, besideTarget(ctx.cwd, WATCHDOG_YML_FILENAME, WATCHDOG_YML_SIDECAR_FILENAME)))) {
 				ctx.ui.notify("oma: cancelled - nothing written", "info");
 				return;
 			}
 		}
-		const result = emitWatchdog(ctx.cwd, content);
-		// Headless writes silently (D3): the file on disk is the report.
+		const mdResult = emitBeside(ctx.cwd, WATCHDOG_FILENAME, WATCHDOG_SIDECAR_FILENAME, content);
+		const ymlResult = emitBeside(ctx.cwd, WATCHDOG_YML_FILENAME, WATCHDOG_YML_SIDECAR_FILENAME, roster);
+		// Headless writes silently (D3): the files on disk are the report.
 		if (!ctx.hasUI) return;
+		// Names come from the write results, so the notify reports what was
+		// actually written — not the pre-write header prediction.
+		const mdName = basename(mdResult.path);
+		const ymlName = basename(ymlResult.path);
 		ctx.ui.notify(
-			result.besideStanding
-				? `oma: wrote ${WATCHDOG_SIDECAR_FILENAME} beside standing ${WATCHDOG_FILENAME} — review, then move into place`
-				: `oma: wrote ${WATCHDOG_FILENAME} — ${kept.length} traps`,
+			mdResult.besideStanding && ymlResult.besideStanding
+				? `oma: wrote ${mdName} + ${ymlName} beside standing files — review, then move into place — enable with /advisor on`
+				: `oma: wrote ${mdName}${mdResult.besideStanding ? " (beside standing)" : ""} + ${ymlName}${ymlResult.besideStanding ? " (beside standing)" : ""} — ${kept.length} traps, ${rosterDoc.advisors.length} advisors — enable with /advisor on`,
 			"info",
 		);
 	};
@@ -126,7 +149,7 @@ export default function omaExtension(pi: ExtensionAPI): void {
 		getArgumentCompletions: (prefix: string) => {
 			const subcommands = [
 				{ value: "scan", label: "scan", description: "Fan out read-only scouts; write advisor-brief.md" },
-				{ value: "emit", label: "emit", description: "Preview and write WATCHDOG.md from kept brief candidates" },
+				{ value: "emit", label: "emit", description: "Preview and write WATCHDOG.md + WATCHDOG.yml from kept brief candidates" },
 			];
 			const matches = subcommands.filter((s) => prefix === "" || s.value.startsWith(prefix));
 			return matches.length > 0 ? matches : null;
