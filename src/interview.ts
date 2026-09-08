@@ -1,4 +1,4 @@
-import { SelectList, replaceTabs, truncateToWidth, visibleWidth, wrapTextWithAnsi } from "@oh-my-pi/pi-tui";
+import { Input, SelectList, replaceTabs, truncateToWidth, visibleWidth, wrapTextWithAnsi } from "@oh-my-pi/pi-tui";
 import type { Component } from "@oh-my-pi/pi-tui";
 import { getSelectListTheme } from "@oh-my-pi/pi-coding-agent";
 import type { BriefCandidate, EvidenceContext } from "./brief.js";
@@ -12,10 +12,11 @@ export interface InterviewDecision {
 	status: "keep" | "drop";
 }
 
-type Choice = "keep" | "drop";
+type Choice = "keep" | "edit" | "drop";
 
 const CHOICES: readonly { value: Choice; label: string; description: string }[] = [
 	{ value: "keep", label: "keep", description: "guard this rule" },
+	{ value: "edit", label: "edit", description: "reword the rule text" },
 	{ value: "drop", label: "drop", description: "exclude from the brief" },
 ];
 
@@ -27,6 +28,8 @@ export class InterviewStepper implements Component {
 	private titles: string[];
 	private readonly decisions: InterviewDecision[] = [];
 	private index = 0;
+	private editing = false;
+	private input: Input | null = null;
 	private list: SelectList;
 	private doneCalled = false;
 	private readonly selectListTheme = getSelectListTheme();
@@ -43,14 +46,19 @@ export class InterviewStepper implements Component {
 
 	private buildList(): SelectList {
 		const list = new SelectList([...CHOICES], CHOICES.length, this.selectListTheme, { overflowSearch: false });
-		// Preselect the row matching the brief's recorded status.
-		list.setSelectedIndex(this.candidates[this.index]?.status === "drop" ? 1 : 0);
+		// Preselect the row matching the brief's recorded status (edit sits
+		// between; it is never a preselection target).
+		list.setSelectedIndex(this.candidates[this.index]?.status === "drop" ? 2 : 0);
 		list.onSelect = (item) => this.choose(item.value as Choice);
 		list.onCancel = () => this.finish(undefined);
 		return list;
 	}
 
 	private choose(choice: Choice): void {
+		if (choice === "edit") {
+			this.enterEdit();
+			return;
+		}
 		const candidate = this.candidates[this.index];
 		if (!candidate) return;
 		this.decisions.push({ id: candidate.id, title: this.titles[this.index], status: choice });
@@ -62,6 +70,33 @@ export class InterviewStepper implements Component {
 		this.list = this.buildList();
 	}
 
+	// Safe exploration on the edit screen: Enter saves, Esc reverts, and
+	// nothing touches the brief until the whole interview commits.
+	private enterEdit(): void {
+		const input = new Input();
+		input.setValue(this.titles[this.index]);
+		input.focused = true;
+		input.onSubmit = (value) => {
+			const trimmed = value.trim();
+			// An empty title would corrupt the brief block grammar; ignore the
+			// submit and stay on the edit screen.
+			if (trimmed === "") return;
+			this.titles[this.index] = trimmed;
+			this.exitEdit();
+		};
+		input.onEscape = () => this.exitEdit();
+		this.input = input;
+		this.editing = true;
+	}
+
+	private exitEdit(): void {
+		this.editing = false;
+		this.input = null;
+		// Rebuild so the cursor resets to the row matching the recorded status —
+		// after saving, the natural next action is keep or drop.
+		this.list = this.buildList();
+	}
+
 	private finish(result: InterviewDecision[] | undefined): void {
 		if (this.doneCalled) return;
 		this.doneCalled = true;
@@ -69,20 +104,29 @@ export class InterviewStepper implements Component {
 	}
 
 	handleInput(data: string): void {
-		// Honor remapped interrupt keys; defaults already overlap SelectList's own
-		// Esc/Ctrl+C cancel handling.
+		// Honor remapped interrupt keys; defaults already overlap SelectList's and
+		// Input's own Esc/Ctrl+C handling.
 		if (this.keybindings.matches(data, "app.interrupt")) {
 			this.finish(undefined);
 			return;
 		}
 		// Normalize raw PTY CR so Enter still confirms even if a user remaps the
-		// select actions away from the enter key (SelectList also confirms on a
-		// literal "\n" unconditionally).
-		this.list.handleInput(data === "\r" ? "\n" : data);
+		// select actions away from the enter key (SelectList and Input also react
+		// to a literal "\n" unconditionally).
+		const key = data === "\r" ? "\n" : data;
+		if (this.editing) {
+			this.input?.handleInput(key);
+			return;
+		}
+		this.list.handleInput(key);
 	}
 
 	render(width: number): readonly string[] {
 		const safeWidth = Math.max(1, width);
+		if (this.editing) {
+			const header = `Edit trap ${this.index + 1}/${this.candidates.length} · enter save · esc revert`;
+			return [truncateToWidth(header, safeWidth), ...(this.input?.render(safeWidth) ?? [])];
+		}
 		const candidate = this.candidates[this.index];
 		if (!candidate) return [];
 		const rows: string[] = [truncateToWidth(this.header(), safeWidth)];
@@ -129,6 +173,7 @@ export class InterviewStepper implements Component {
 
 	invalidate(): void {
 		this.list.invalidate();
+		this.input?.invalidate();
 	}
 
 	dispose(): void {}

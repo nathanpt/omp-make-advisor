@@ -110,8 +110,14 @@ function frameWith(events: readonly unknown[], substring: string): FrameEvent {
 
 // The cursor glyph follows the host's symbol preset (ASCII ">"); the cursor
 // row is the choice row without the two-space indent.
-const cursorOn = (frame: FrameEvent, word: "keep" | "drop"): boolean =>
+const cursorOn = (frame: FrameEvent, word: "keep" | "edit" | "drop"): boolean =>
 	frame.lines.some((line) => /^\S/.test(plain(line)) && new RegExp(`\\b${word}\\b`).test(plain(line)));
+
+/** Wait for a decision screen rendered strictly after frame index `after`. */
+const decisionScreenAfter = (events: readonly unknown[], after: number): FrameEvent | undefined =>
+	framesOf(events)
+		.slice(after + 1)
+		.find((f) => f.lines.some((line) => /^Trap \d+\/\d+ /.test(plain(line))));
 
 test("walkthrough: one trap per screen, evidence inline, progress advances", async () => {
 	const host = spawnHost();
@@ -184,19 +190,18 @@ test("walkthrough: one trap per screen, evidence inline, progress advances", asy
 test("drop choice records a dropped decision", async () => {
 	const host = spawnHost();
 	try {
-		let events = await host.waitUntil((es) => es.some((e) => (e as Event).type === "frame"));
-		host.write("\x1b[B"); // move to drop
+		await host.waitUntil((es) => es.some((e) => (e as Event).type === "frame"));
+		host.write("\x1b[B"); // keep → edit
+		await host.waitUntil((es) => framesOf(es).some((f) => cursorOn(f, "edit")));
+		host.write("\x1b[B"); // edit → drop
 		await host.waitUntil((es) => framesOf(es).some((f) => cursorOn(f, "drop")));
 		host.write("\r");
-		events = await host.waitUntil((es) =>
-			framesOf(es).some((f) => f.lines.some((line) => plain(line).includes("Trap 2/3"))),
-		);
-		// The recorded decision is visible only in the final result; finish the walk.
-		host.write("\r");
-		await host.waitUntil((es) =>
-			framesOf(es).some((f) => f.lines.some((line) => plain(line).includes("Trap 3/3"))),
-		);
-		host.write("\r");
+		for (const marker of ["Trap 2/3", "Trap 3/3"]) {
+			await host.waitUntil((es) =>
+				framesOf(es).some((f) => f.lines.some((line) => plain(line).includes(marker))),
+			);
+			host.write("\r");
+		}
 		await host.waitUntil((es) => es.some((e) => (e as Event).type === "done"));
 		assert.equal(await host.exited, 0);
 		const done = host.readAll().find((e) => e.type === "done") as { result: Decision[] | null };
@@ -241,6 +246,125 @@ test("preload: drop status preselects the drop row", async () => {
 		await host.waitUntil((es) => es.some((e) => (e as Event).type === "done"));
 		const done = host.readAll().find((e) => e.type === "done") as { result: Decision[] | null };
 		assert.equal(done.result?.[0].status, "drop");
+	} finally {
+		host.cleanup();
+	}
+});
+
+test("edit flow: rewording round-trips into the decision", async () => {
+	const host = spawnHost();
+	try {
+		await host.waitUntil((es) => es.some((e) => (e as Event).type === "frame"));
+		host.write("\x1b[B"); // keep → edit
+		const atEdit = await host.waitUntil((es) => framesOf(es).some((f) => cursorOn(f, "edit")));
+		host.write("\r");
+		await host.waitUntil((es) =>
+			framesOf(es).some((f) => f.lines.some((line) => plain(line).includes("Edit trap 1/3 · enter save · esc revert"))),
+		);
+		// The input is seeded with the current rule text (it scrolls, one line).
+		await host.waitUntil((es) =>
+			framesOf(es).some((f) => f.lines.some((line) => plain(line).includes("must hold the ingest lock"))),
+		);
+		host.write(" v2");
+		// The input line scrolls horizontally; the appended text stays on it.
+		const typed = await host.waitUntil((es) =>
+			framesOf(es).some((f) => f.lines.some((line) => plain(line).includes("lock v2"))),
+		);
+		const typedIdx = framesOf(typed).findIndex((f) => f.lines.some((line) => plain(line).includes("lock v2")));
+		host.write("\r"); // save
+		// Back on the decision screen; the 60-col render wraps "v2" onto its
+		// own line under the reworded title.
+		await host.waitUntil((es) => {
+			const screen = decisionScreenAfter(es, typedIdx);
+			return (
+				screen !== undefined &&
+				screen.lines.some((line) => plain(line).trimEnd() === "v2")
+			);
+		});
+		for (const marker of ["Trap 2/3", "Trap 3/3"]) {
+			host.write("\r");
+			await host.waitUntil((es) =>
+				framesOf(es).some((f) => f.lines.some((line) => plain(line).includes(marker))),
+			);
+		}
+		host.write("\r");
+		await host.waitUntil((es) => es.some((e) => (e as Event).type === "done"));
+		const done = host.readAll().find((e) => e.type === "done") as { result: Decision[] | null };
+		assert.equal(done.result?.[0].title, "Any write to the shared ingest map must hold the ingest lock v2");
+		assert.equal(done.result?.[0].status, "keep");
+	} finally {
+		host.cleanup();
+	}
+});
+
+test("edit esc reverts the rewording", async () => {
+	const host = spawnHost();
+	try {
+		await host.waitUntil((es) => es.some((e) => (e as Event).type === "frame"));
+		host.write("\x1b[B");
+		await host.waitUntil((es) => framesOf(es).some((f) => cursorOn(f, "edit")));
+		host.write("\r");
+		await host.waitUntil((es) =>
+			framesOf(es).some((f) => f.lines.some((line) => plain(line).includes("Edit trap 1/3"))),
+		);
+		host.write(" XXX");
+		// The input line is one scrolling row; the typed suffix stays on it.
+		const typed = await host.waitUntil((es) =>
+			framesOf(es).some((f) => f.lines.some((line) => plain(line).includes("XXX"))),
+		);
+		const typedIdx = framesOf(typed).findIndex((f) => f.lines.some((line) => plain(line).includes("XXX")));
+		host.write("\x1b"); // revert
+		await host.waitUntil((es) => {
+			const screen = decisionScreenAfter(es, typedIdx);
+			return screen !== undefined && !screen.lines.some((line) => plain(line).includes("XXX"));
+		});
+		for (const marker of ["Trap 2/3", "Trap 3/3"]) {
+			host.write("\r");
+			await host.waitUntil((es) =>
+				framesOf(es).some((f) => f.lines.some((line) => plain(line).includes(marker))),
+			);
+		}
+		host.write("\r");
+		await host.waitUntil((es) => es.some((e) => (e as Event).type === "done"));
+		const done = host.readAll().find((e) => e.type === "done") as { result: Decision[] | null };
+		assert.equal(done.result?.[0].title, "Any write to the shared ingest map must hold the ingest lock");
+	} finally {
+		host.cleanup();
+	}
+});
+
+test("edit: empty submit is ignored, edit stays live", async () => {
+	const host = spawnHost();
+	try {
+		await host.waitUntil((es) => es.some((e) => (e as Event).type === "frame"));
+		host.write("\x1b[B");
+		await host.waitUntil((es) => framesOf(es).some((f) => cursorOn(f, "edit")));
+		host.write("\r");
+		await host.waitUntil((es) =>
+			framesOf(es).some((f) => f.lines.some((line) => plain(line).includes("Edit trap 1/3"))),
+		);
+		// Ctrl+U clears the seeded title in one keystroke, then try to save nothing.
+		host.write("\x15");
+		host.write("\r");
+		// If the empty submit were honored (or exited the screen), a later
+		// keystroke would land on the SelectList instead of the live input.
+		host.write("Z");
+		const probed = await host.waitUntil((es) =>
+			framesOf(es).some((f) => f.lines.some((line) => plain(line).includes("> Z"))),
+		);
+		const probeIdx = framesOf(probed).findIndex((f) => f.lines.some((line) => plain(line).includes("> Z")));
+		host.write("\x1b"); // revert; the recorded title is still the original
+		await host.waitUntil((es) => decisionScreenAfter(es, probeIdx) !== undefined);
+		for (const marker of ["Trap 2/3", "Trap 3/3"]) {
+			host.write("\r");
+			await host.waitUntil((es) =>
+				framesOf(es).some((f) => f.lines.some((line) => plain(line).includes(marker))),
+			);
+		}
+		host.write("\r");
+		await host.waitUntil((es) => es.some((e) => (e as Event).type === "done"));
+		const done = host.readAll().find((e) => e.type === "done") as { result: Decision[] | null };
+		assert.equal(done.result?.[0].title, "Any write to the shared ingest map must hold the ingest lock");
 	} finally {
 		host.cleanup();
 	}
