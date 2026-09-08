@@ -10,9 +10,10 @@ learning vehicle for TUI design on OMP's real stack. Extension scaffold landed w
 ## Commands
 
 - `npm run typecheck` — `tsc --noEmit` over `index.ts` + `src/**/*.ts` (tests excluded).
-- `npm test` — bun test over `test/*.test.ts` (loader + brief suites; node cannot load the
+- `npm test` — bun test over `test/*.test.ts` (loader, brief, emit suites; node cannot load the
   extension graph: `@oh-my-pi/pi-tui` sources use `bun:` protocols).
-- `npm run test:tui` — bun test over `test/tui/` (PTY snapshot tests, f-002 gate).
+- `npm run test:tui` — bun test over `test/tui/` (PTY snapshot tests for the interview
+  stepper and the emit preview).
 - `npm run probe` — headless omp load check: `omp -e ./index.ts -p "reply with the single word ready"`.
 - `./init.sh` — docs checks plus typecheck and tests (full gate).
 - Persistent install (user scope, links this working tree — no build step, edits are live):

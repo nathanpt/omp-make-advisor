@@ -1,8 +1,8 @@
 import type { ExtensionAPI, ExtensionCommandContext } from "@oh-my-pi/pi-coding-agent";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { TrapPicker, type PickerResult } from "./src/picker.js";
-import { readBrief, verifyEvidenceAnchors, writeBrief } from "./src/brief.js";
+import { InterviewStepper, type InterviewDecision } from "./src/interview.js";
+import { readBrief, verifyEvidenceAnchors, writeBrief, readEvidenceContext } from "./src/brief.js";
 import { buildScanPrompt } from "./src/scan.js";
 import { buildWatchdogMd, emitWatchdog, WATCHDOG_FILENAME } from "./src/emit.js";
 import { WatchdogPreview } from "./src/preview.js";
@@ -27,9 +27,9 @@ export default function omaExtension(pi: ExtensionAPI): void {
 		pi.sendUserMessage(buildScanPrompt());
 	};
 
-	const runPicker = async (ctx: ExtensionCommandContext): Promise<void> => {
+	const runInterview = async (ctx: ExtensionCommandContext): Promise<void> => {
 		// Headless: advisor-brief.md itself is the fallback checklist (statuses are
-		// edited inline in the file); the picker is the interactive surface only.
+		// edited inline in the file); the interview is the interactive surface only.
 		if (!ctx.hasUI) return;
 		const read = readBrief(ctx.cwd);
 		if (!read.ok) {
@@ -47,20 +47,32 @@ export default function omaExtension(pi: ExtensionAPI): void {
 			ctx.ui.notify("oma: advisor-brief.md has no candidates", "warning");
 			return;
 		}
-		const initialStates = new Map(candidates.map((c) => [c.id, c.status]));
-		const result = await ctx.ui.custom<PickerResult | undefined>(
-			(_tui, _theme, keybindings, done) => new TrapPicker(candidates, keybindings, done, initialStates),
+		// Evidence lines are read once, before the overlay mounts; the stepper
+		// itself stays pure render logic. Null contexts (area-guard dirs,
+		// unresolvable anchors) simply render without inline lines.
+		const evidence = new Map(candidates.map((c) => [c.id, readEvidenceContext(ctx.cwd, c.evidence)]));
+		const result = await ctx.ui.custom<InterviewDecision[] | undefined>(
+			(_tui, _theme, keybindings, done) => new InterviewStepper(candidates, evidence, keybindings, done),
 			{ overlay: true },
 		);
 		if (!result) {
 			ctx.ui.notify("oma: cancelled - brief unchanged", "info");
 			return;
 		}
-		const kept = new Set(result.kept);
+		const byId = new Map(result.map((d) => [d.id, d]));
 		// Write back onto the parsed candidates so evidence and rationale survive.
-		const updated = candidates.map((c) => ({ ...c, status: kept.has(c.id) ? ("keep" as const) : ("drop" as const) }));
+		const updated = candidates.map((c) => {
+			const decision = byId.get(c.id);
+			return decision ? { ...c, title: decision.title, status: decision.status } : c;
+		});
 		writeBrief(ctx.cwd, updated);
-		ctx.ui.notify(`oma: brief updated — kept ${result.kept.length}, dropped ${result.dropped.length}`, "info");
+		const kept = updated.filter((c) => c.status === "keep").length;
+		const edited = result.filter((d) => candidates.find((c) => c.id === d.id)?.title !== d.title).length;
+		ctx.ui.notify(
+			`oma: brief updated — kept ${kept}, dropped ${updated.length - kept}` +
+				(edited > 0 ? `, edited ${edited}` : ""),
+			"info",
+		);
 	};
 
 	const runEmit = async (ctx: ExtensionCommandContext): Promise<void> => {
@@ -126,7 +138,7 @@ export default function omaExtension(pi: ExtensionAPI): void {
 			const sub = args.trim();
 			if (sub === "scan") return runScan(ctx);
 			if (sub === "emit") return runEmit(ctx);
-			return runPicker(ctx);
+			return runInterview(ctx);
 		},
 	};
 	pi.registerCommand("make-advisor", commandOptions);
@@ -157,7 +169,7 @@ export default function omaExtension(pi: ExtensionAPI): void {
 		"info",
 	);
 	// Liveness check: parseBrief validates grammar only — a hallucinated anchor
-	// would otherwise flow silently into the picker and the WATCHDOG emit.
+	// would otherwise flow silently into the interview and the WATCHDOG emit.
 	const unanchored = verifyEvidenceAnchors(ctx.cwd, candidates);
 	if (unanchored.length > 0) {
 		const ids = unanchored.map((failure) => failure.id).join(", ");

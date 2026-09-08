@@ -1,5 +1,4 @@
 {
-  "project": "omp-make-advisor",
   "updated": "2026-09-08",
   "selection_rule": "Take exactly one highest-priority feature with passes=false whose dependencies all pass. Update only passes/evidence/updated when checks succeed; never weaken or delete requirements.",
   "features": [
@@ -32,7 +31,7 @@
         "Headless snapshot test drives the overlay through a PTY harness and asserts frames"
       ],
       "passes": true,
-      "evidence": "bun test test/tui/: accept + cancel flows pass; frame assertions on [keep]/[drop] labels and done/disposed events",
+      "evidence": "typecheck/test/probe pass + interactive /make-advisor and /oma notify verified; superseded 2026-09-08 by f-006: bare /oma opens the interview stepper, accept/cancel/preload contracts migrated to test/tui/interview.test.ts (picker + host deleted)",
       "priority": 2,
       "dependencies": ["f-001"],
       "source": "DESIGN.md §6 slice 2, §10 MVP item 1"
@@ -96,8 +95,8 @@
         "Edit flow round-trips free text into the brief and back",
         "Snapshot tests cover each screen"
       ],
-      "passes": false,
-      "evidence": null,
+      "passes": true,
+      "evidence": "typecheck clean; npm test 12 pass (readEvidenceContext matrix); test:tui 10 pass — 7 stepper PTY tests (walkthrough with inline evidence + 3/3 bar, drop, cancel, preload, edit-save round-trip, edit-esc revert, empty-submit guard); probe exit 0 ready; ./init.sh INIT_EXIT=0; live PTY (omp 18.1.14, fixture brief): /oma walk keep/edit/drop → toast 'oma: brief updated — kept 2, dropped 1, edited 1', brief on disk carries the edited title and flipped status with evidence/rationale intact; reopen + Esc → 'oma: cancelled - brief unchanged', md5 byte-identical",
       "priority": 6,
       "dependencies": ["f-003"],
       "source": "DESIGN.md §10 Next item 1, §6 slices 3-4"

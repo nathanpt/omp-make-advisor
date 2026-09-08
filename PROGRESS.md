@@ -1,20 +1,24 @@
 # PROGRESS
 
-Updated: 2026-09-08 (f-004 + f-005 session)
+Updated: 2026-09-08 (f-006 session)
 
 ## Current repository state
 
-- Git repository initialized (`main`); eleven commits: foundation docs → package scaffold → f-001
-  skeleton → f-002 picker → PTY harness → loader-test runner fix → state record → post-slices
-  cleanup → f-003 brief module → f-003 picker preload → f-003 scan wiring.
-- Slices 1–3 complete and passing: `/oma scan` sends the 4-lens scan prompt to the session agent
-  (scouts write `advisor-brief.md` at the project root); bare `/oma` opens the picker preloaded
-  with brief statuses and writes accepted decisions back (evidence + rationale preserved);
-  `src/traps.ts` deleted — `CandidateTrap` lives in `src/brief.ts`.
+- Git repository initialized (`main`); fourteen commits through the f-006 cutover (foundation
+  docs → package scaffold → f-001..f-003 slices → install-manifest fix → f-004/f-005
+  emit+preview+precision → f-006 slice 3 stepper → slice 4 edit flow + cutover + docs).
+- Slices 1–4 complete and passing: `/oma scan` fans out the 4-lens scouts into
+  `advisor-brief.md`; bare `/oma` opens the **interview stepper** — one trap per screen with
+  inline evidence lines, `3/12` progress bar, keep/edit/drop via SelectList, and a free-text
+  edit screen (pi-tui `Input`) whose saved title round-trips into the brief; `/oma emit`
+  previews and writes `WATCHDOG.md`. `src/picker.ts` is deleted — the stepper superseded the
+  batch picker (DESIGN.md §2 names the stepper as THE interview surface; accept/cancel/preload
+  contracts migrated to `test/tui/interview.test.ts`; f-002 evidence annotated as superseded).
 - Toolchain: npm + node ≥22 + `tsc --noEmit`; **bun runs both test suites** (`npm test`,
-  `npm run test:tui`); no build step (`omp -e index.ts` loads TS directly); tsx removed (dead
-  after the runner switch). devDeps `@oh-my-pi/pi-coding-agent`/`-pi-tui` 18.1.12 vs omp 18.1.11
-  runtime — no drift observed.
+  `npm run test:tui`); no build step (`omp -e index.ts` loads TS directly). devDeps
+  `@oh-my-pi/pi-coding-agent`/`-pi-tui` 18.1.12 vs omp runtime now **18.1.14** (was 18.1.11
+  at f-003) — all f-006 flows verified green on 18.1.14; no drift observed.
+
 
 ## Confirmed working surfaces
 
@@ -23,11 +27,12 @@ Updated: 2026-09-08 (f-004 + f-005 session)
   near-simultaneous ones share a redraw window); at `agent_end` the completion notify
   "oma: scan complete — N candidates in advisor-brief.md" rendered in full post-simplify-pass
   (an earlier run saw it collide with the model's reply toast — timing, not logic).
-- Bare `/oma` after a scan: picker opens on the scanned candidates with statuses preloaded
-  (re-open showed `❯ [drop] …` for a previously dropped trap); `space`+`Enter` →
-  `oma: brief updated — kept 10, dropped 1` toast and the brief on disk shows the flipped
-  `· drop ·` with evidence/rationale intact; `Esc` → `oma: cancelled - brief unchanged` toast,
-  file byte-identical (md5 unchanged).
+- Bare `/oma` after a scan (f-006 stepper, live 2026-09-08 on omp 18.1.14): opens on trap 1
+  with real source lines inline (`1 │ …` gutter, `… +N more lines` cap) and the `Trap 1/3 ▮▯▯`
+  progress bar; the edit screen seeds the rule text, and a saved reword lands verbatim in the
+  brief (`(v2 wording)` observed on disk) with the completion toast
+  `oma: brief updated — kept 2, dropped 1, edited 1`; preloaded drop preselects the drop row;
+  `Esc` → `oma: cancelled - brief unchanged`, md5 byte-identical.
 - Headless scan (E2E, `OMA_E2E=1`): `omp -e index.ts -p "<scan prompt>"` in a planted fixture
   repo exits 0 and writes a parseable brief with existing evidence paths.
 - Headless load: `omp -e ./index.ts -p …` exits 0, replies `ready`, no UI attempt.
@@ -36,13 +41,13 @@ Updated: 2026-09-08 (f-004 + f-005 session)
   `advisor-brief.md`; `parseBrief` → 11 candidates, 0 skipped; all 11 evidence anchors resolve
   with line ranges within file bounds (`verifyEvidenceAnchors` on the live brief returns `[]`).
 
+
 ## Active work
 
-None in flight. f-004 (WATCHDOG.md emit with preview) and f-005 (precision
-fixtures + recorded run) are complete and passing. Next feature per selection
-rule: `f-006` (full interview stepper; deps f-003 ✓) or `f-007` (WATCHDOG.yml
-roster emission — carries the literal-block-scalar serializer semantics noted
-below).
+None in flight. f-006 is complete and passing. Next feature per selection rule: `f-007`
+(WATCHDOG.yml roster emission — deps f-004 ✓; carries the literal-block-scalar serializer
+semantics from `advisor/config.ts`). f-008 stays blocked on f-007.
+
 
 ## Blockers and unknowns
 
@@ -276,12 +281,59 @@ Resolved this session:
     copy line as the sole cause (README H1 exonerated). Fixed to
     `cp -r "$HERE/$name/." "$tmp"/`; the table above is from the fixed run.
 
+- f-006 (2026-09-08, all pass; commits `d24a122` slice 3, `37ef13d` slice 4, cutover commit):
+  - **Slice 3 — stepper**: `src/interview.ts` `InterviewStepper` (SelectList keep/edit/drop
+    per trap, one trap per screen, `Trap n/m ▮▯▯` position bar painted with
+    `getSelectListTheme().selectedText`, rationale line, `Evidence:` anchor + guttered source
+    lines wrapped with indent-preserving continuations and a `… +N more lines` cap);
+    `readEvidenceContext(cwd, evidence, maxLines=5)` in src/brief.ts shares the
+    `EVIDENCE_RANGE` grammar with `verifyEvidenceAnchors` (dirs/ghosts/past-EOF → null).
+    `src/keybindings.ts` extracted as the shared `KeybindingsLike` seam.
+  - **Slice 4 — edit flow**: pi-tui `Input` seeded with the rule title, `focused = true`
+    (CURSOR_MARKER), enter save / esc revert, exit resets the SelectList cursor to the
+    status row. Empty-submit guard protects the brief block grammar (title must be non-empty).
+  - **Cutover**: bare `/oma` now runs `runInterview` (was `runPicker`); decisions write back
+    titles+statuses onto the parsed candidates (evidence/rationale survive); completion toast
+    `oma: brief updated — kept N, dropped M, edited K`. `src/picker.ts`, `test/tui/host.ts`,
+    `test/tui/picker.test.ts` deleted; `src/preview.ts` imports the seam from
+    `src/keybindings.js`. `/oma emit` unchanged — edited titles flow into WATCHDOG.md via the
+    brief automatically.
+  - Tests: `test/brief.test.ts` +1 (readEvidenceContext matrix: in-cap range, over-cap
+    elision, single-line, exact-EOF, bare-file preview, dir/ghost/past-EOF → null);
+    `test/tui/interview.test.ts` 7 PTY tests (walkthrough w/ inline evidence + bar + dir
+    evidence without lines, drop, cancel, preload, edit-save round-trip incl. wrapped-title
+    assertion, edit-esc revert, empty-submit guard via live-input probe).
+  - Gates: `npm run typecheck` clean; `npm test` 12 pass; `npm run test:tui` 10 pass;
+    `npm run probe` PROBE_EXIT=0 `ready` (unpiped); `./init.sh` INIT_EXIT=0
+    `All checks passed.` (unpiped).
+  - Live interactive PTY smoke (hub-hosted omp **18.1.14**, temp fixture repo with seeded
+    3-candidate brief): stepper opened with real `src/ingest/loop.ts:1-5` lines inline;
+    t2 edit appended ` (v2 wording)` — decision screen + brief on disk both carry the new
+    title; t3 drop preselected from status; toast `oma: brief updated — kept 2, dropped 1,
+    edited 1`; reopen + Esc → `oma: cancelled - brief unchanged`, md5 byte-identical; no
+    WATCHDOG files written by the stray toast below.
+  - **Incident — edit-screen empty-submit bug (caught by the PTY test)**: the guard skipped
+    the empty assignment but still fell through to `exitEdit()` — comment said "stay on the
+    edit screen", code left it. Found via the live-input probe (after ctrl+u + `\r`, a typed
+    `Z` landed on the SelectList instead of the input). Fixed with an early return.
+  - **Test-authoring lessons** (recorded for f-007/f-008 PTY work): (a) 60-col renders wrap
+    appended title text across lines — assert wrapped segments, never the joined string;
+    (b) keybinding-driven keys must be sent as single input events — `\x7f`.repeat(80) as one
+    write matches no binding; use one-shot keys like ctrl+u (`tui.editor.deleteToLineStart`);
+    (c) the cursor glyph follows the host symbol preset (ASCII `>` vs production `❯`) —
+    assert the cursor row via indentation (`/^\S/` + word boundary), not the glyph.
+  - **Observation, unexplained (omp 18.1.14)**: a `oma: cancelled - nothing written` toast
+    appeared in the smoke session's scrollback before any interactive keystroke, with no
+    WATCHDOG file written. Most plausible: the hub text-send's trailing enter interacted with
+    omp's command-completion palette and dispatched `/oma emit`, whose preview the subsequent
+    Esc cancelled. Bare `/oma` provably opened the stepper on both invocations; re-check when
+    driving omp 18.1.14 via hub text sends.
+
 ## Next useful move
 
-Start `f-006` (full interview stepper: per-trap evidence inline, progress bar,
-keep/edit/drop with free-text edit; deps f-003 ✓) — `WatchdogPreview` +
-f-004 step 4). The precision run also sharpened f-008: clean-repo specificity
-and keyword-vs-judge scoring are the two measured gaps. Carried from the
-self-scan (still true): f-009's staleness signal is precisely
-`verifyEvidenceAnchors` reuse at picker/doctor time — evidence line-ranges
-that no longer resolve.
+Start `f-007` (WATCHDOG.yml roster emission: 2-3 starter roles with model/tool suggestions,
+validating against OMP's advisor discovery walk and serializer semantics; deps f-004 ✓).
+The emit-beside discipline and golden-test pattern from f-004 apply unchanged;
+`readEvidenceContext` already demonstrates the anchor-grammar reuse the discovery
+validation needs. Carried (still true): f-009's staleness signal is
+`verifyEvidenceAnchors` reuse at interview/doctor time.

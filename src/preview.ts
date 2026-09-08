@@ -1,6 +1,6 @@
 import { ScrollView, truncateToWidth, wrapTextWithAnsi, replaceTabs } from "@oh-my-pi/pi-tui";
 import type { Component } from "@oh-my-pi/pi-tui";
-import type { KeybindingsLike } from "./picker.js";
+import type { KeybindingsLike } from "./keybindings.js";
 
 // Fixed viewport budget for the previewed body; taller content scrolls.
 const BODY_HEIGHT = 12;
