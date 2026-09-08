@@ -475,9 +475,29 @@ Resolved this session:
 
 ## Next useful move
 
-Start `f-008` (automated validator + scored report; deps f-005 ✓, f-007 ✓). Open question
-carried from §11: whether `omp -p --advisor` exposes drain/dump semantics sufficient for
-unattended scoring — probe before building. The f-005 precision harness
-(`test/fixtures/precision/`) is the fixture source; f-005 findings (clean-tree false
-positives, keyword-miss on err-swallow) set the scoring-judge bar. Carried (still true):
-f-009's staleness signal is `verifyEvidenceAnchors` reuse at interview/doctor time.
+Start `f-008` (automated validator + scored report; deps f-005 ✓, f-007 ✓). The §11 open
+question is RESOLVED by the 2026-09-08 probe (live run, recorded below): `omp -p --advisor`
+is sufficient for unattended advisor scoring. Architecture: per precision fixture — seed
+brief → `/oma emit` → run `omp -p --advisor --auto-approve` with a trap-triggering task →
+extract `advise` calls from `<session>/__advisor.<slug>.jsonl` → keyword-score against
+expected.json (violation: ≥1 advise note hits expected keywords; clean: zero trap
+advisories) → scored report. Second extraction point: `<advisory advisor=… severity=…>`
+elements in the primary session JSONL (not echoed to `-p` stdout text mode — score from
+the JSONL artifacts, not stdout).
+
+- f-008 probe (2026-09-08, live): conc-map fixture + emitted WATCHDOG pair;
+  `timeout 300 omp -p --advisor --auto-approve "add dropBatch() deleting from batchIndex"`.
+  Exit 0 in 56s. Findings: (1) roster advisor built from the emitted `WATCHDOG.yml`
+  (`Concurrency Watcher`), `@slow` resolved to a live model — f-007's portability
+  assumption held in a real session; (2) advisor used its read grant, caught the exact
+  trap (bare `batchIndex.delete` vs `withIngestLock`), raised `advise` severity `concern`,
+  then correctly stayed silent on the next delta (dedupe); (3) `__advisor.concurrency-
+  watcher.jsonl` persisted every advisor turn (thinking, toolCalls with `{note, severity}`,
+  usage) — 13 records; (4) advisory ALSO injected into the primary session JSONL as
+  `<advisory advisor="Concurrency Watcher" severity="concern" guidance="weigh, don't
+  blindly obey">`; (5) print-mode drain per advisor-watchdog.md: up to 10 min for final
+  reviews (30s error budget) — our reviews completed well inside it; (6) `--auto-approve`
+  required for unattended edits. Probe session retained at
+  `~/.omp/agent/sessions/-tmp-tmp.CLnrjvHMMH/2026-09-08T19-20-29-*`.
+Carried (still true): f-009's staleness signal is `verifyEvidenceAnchors` reuse at
+interview/doctor time.
