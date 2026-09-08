@@ -1,6 +1,6 @@
 import { Box, ScrollView, SelectList, replaceTabs, wrapTextWithAnsi } from "@oh-my-pi/pi-tui";
 import type { Component } from "@oh-my-pi/pi-tui";
-import { PLAIN_FRAME_THEME, frame, type FrameTheme } from "./frame.js";
+import { dottedRule, PLAIN_FRAME_THEME, frame, type FrameTheme } from "./frame.js";
 import { getSelectListTheme } from "@oh-my-pi/pi-coding-agent";
 import type { KeybindingsLike } from "./keybindings.js";
 import type { FixtureResult, ValidateReport } from "./validate.js";
@@ -109,24 +109,37 @@ export class ReportScreen implements Component {
 			const innerWidth = Math.max(1, safeWidth - 4);
 			if (this.lastDetailWidth !== innerWidth) {
 				this.lastDetailWidth = innerWidth;
-				const rows: string[] = [];
-				for (const advise of fixture.advises) {
-					rows.push(...wrapTextWithAnsi(replaceTabs(`- [${advise.severity}] (${advise.slug}) ${advise.note}`), innerWidth));
-				}
-				const keywords = fixture.keywords.join(", ") || "—";
-				const hits = fixture.hits.join(", ") || "—";
-				rows.push(...wrapTextWithAnsi(replaceTabs(`keywords: ${keywords} · hits: ${hits}`), innerWidth));
-				rows.push(
-					...wrapTextWithAnsi(
-						replaceTabs(`cost $${fixture.costUsd.toFixed(4)} · model ${fixture.models.join(", ") || "—"}`),
-						innerWidth,
-					),
-				);
-				this.scrollView.setLines(rows);
+				this.scrollView.setLines(this.buildDetailRows(fixture, innerWidth));
 			}
 			return this.detailFrame.render(safeWidth);
 		}
 		return this.listFrame.render(safeWidth);
+	}
+
+	// Detail i — aligned facts: severity badge over the note, dotted rule,
+	// then a dim label column with the values (model right-aligned).
+	private buildDetailRows(fixture: FixtureResult, innerWidth: number): string[] {
+		const rows: string[] = [];
+		const tone = (severity: string): "error" | "warning" | "dim" =>
+			severity === "blocker" ? "error" : severity === "concern" ? "warning" : "dim";
+		for (const advise of fixture.advises) {
+			rows.push(
+				this.theme.fg(tone(advise.severity), `● ${advise.severity.toUpperCase()}`) +
+					this.theme.fg("dim", ` · ${advise.slug}`),
+			);
+			for (const line of wrapTextWithAnsi(replaceTabs(advise.note), innerWidth)) rows.push(line);
+			rows.push("");
+		}
+		if (fixture.advises.length > 0) rows.push(dottedRule(this.theme, innerWidth));
+		const fact = (label: string, value: string, color?: "success" | "dim"): string =>
+			this.theme.fg("dim", `${label} `.padEnd(11)) + (color ? this.theme.fg(color, value) : value);
+		rows.push(fact("keywords", fixture.keywords.join(", ") || "—", fixture.keywords.length > 0 ? undefined : "dim"));
+		rows.push(fact("hits", fixture.hits.join(", ") || "—", fixture.hits.length > 0 ? "success" : "dim"));
+		const costValue = `$${fixture.costUsd.toFixed(4)}`;
+		const model = fixture.models.join(", ");
+		const modelFill = Math.max(1, innerWidth - 11 - costValue.length - model.length);
+		rows.push(this.theme.fg("dim", "cost".padEnd(11)) + costValue + " ".repeat(modelFill) + this.theme.fg("dim", model));
+		return rows;
 	}
 
 	invalidate(): void {

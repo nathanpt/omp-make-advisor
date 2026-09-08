@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { basename, join } from "node:path";
-import { Box, SelectList } from "@oh-my-pi/pi-tui";
-import { PLAIN_FRAME_THEME, frame, type FrameTheme } from "./frame.js";
+import { Box, SelectList, wrapTextWithAnsi } from "@oh-my-pi/pi-tui";
+import { PLAIN_FRAME_THEME, frame, splitPane, type FrameTheme } from "./frame.js";
 import type { Component } from "@oh-my-pi/pi-tui";
 import type { KeybindingsLike } from "./keybindings.js";
 import type { ValidateReport } from "./validate.js";
@@ -63,8 +63,8 @@ export function readHubStatus(cwd: string): HubStatus {
 	};
 }
 
-// Row descriptions stay short: the SelectList description column gets ~24
-// cells at the narrowest supported width (60 cols).
+// Headless summary rows stay descriptive (D3: stdout is the interface). The
+// PTY rows are tighter — status glyph in the icon column, compact label.
 function scanDescription(status: HubStatus): string {
 	return status.brief.present ? `✓ advisor-brief · ${status.brief.candidates} traps` : "— run /oma scan first";
 }
@@ -81,7 +81,6 @@ function emitDescription(status: HubStatus): string {
 	return status.brief.kept > 0 ? `— ${status.brief.kept} kept ready` : "— nothing to emit";
 }
 
-
 function validateDescription(status: HubStatus): string {
 	switch (status.report.state) {
 		case "ready":
@@ -93,6 +92,68 @@ function validateDescription(status: HubStatus): string {
 	}
 }
 
+// Split-pane rows: status glyph in the icon column (SelectList renders icons
+// at any width — the description column does not survive a 25-cell pane),
+// compact label carries the rest. Rich state lives in the right pane.
+function stageItems(status: HubStatus): { value: HubAction; icon: string; label: string }[] {
+	const emitState = (): { icon: string; text: string } => {
+		const { md, yml } = status.watchdog;
+		if (md === "canonical" && yml === "canonical") return { icon: "✓", text: "in place" };
+		if (md === "sidecar" || yml === "sidecar") return { icon: "⚠", text: "sidecars" };
+		return status.brief.kept > 0 ? { icon: "—", text: `${status.brief.kept} ready` } : { icon: "—", text: "nothing kept" };
+	};
+	const validateState = (): { icon: string; text: string } => {
+		switch (status.report.state) {
+			case "ready":
+				return { icon: "✓", text: `$${status.report.totalCostUsd.toFixed(2)}` };
+			case "malformed":
+				return { icon: "—", text: "malformed" };
+			default:
+				return { icon: "—", text: "no report" };
+		}
+	};
+	const emit = emitState();
+	const validate = validateState();
+	return [
+		{
+			value: "scan",
+			icon: status.brief.present ? "✓" : "—",
+			label: `scan · ${status.brief.candidates} traps`,
+		},
+		{
+			value: "interview",
+			icon: status.brief.kept > 0 ? "✓" : "—",
+			label: status.brief.present ? `interview · ${status.brief.kept}/${status.brief.candidates}` : "interview · blocked",
+		},
+		{ value: "emit", icon: emit.icon, label: `emit · ${emit.text}` },
+		{ value: "validate", icon: validate.icon, label: `validate · ${validate.text}` },
+	];
+}
+
+// Rich right-pane copy for the split layout: what the stage does + its live
+// artifact line. (Row labels above stay telegraphic.)
+const STAGE_ABOUT: Record<HubAction, string> = {
+	scan: "4 read-only scouts fan out over the repo and write advisor-brief.md with candidate traps per lens.",
+	interview: "Walk every candidate trap: keep, reword, or drop. Decisions write back to the brief.",
+	emit: "Preview and write WATCHDOG.md + WATCHDOG.yml from the kept traps. Standing files stay untouched — sidecars land beside them for review.",
+	validate: "Render the scored precision report from the last validate.sh run (this repo's own fixtures).",
+};
+
+function stageMeta(action: HubAction, status: HubStatus): string {
+	switch (action) {
+		case "scan":
+			return status.brief.present ? `advisor-brief.md · ${status.brief.candidates} traps` : "writes advisor-brief.md";
+		case "interview":
+			return `edits advisor-brief.md · ${status.brief.kept} kept`;
+		case "emit":
+			return "writes 2 files";
+		case "validate": {
+			const dev = "dev · reads results/report.json";
+			return status.report.state === "ready" ? `${dev} · $${status.report.totalCostUsd.toFixed(4)}` : dev;
+		}
+	}
+}
+
 export type HubAction = "scan" | "interview" | "emit" | "validate";
 
 // The hub menu: one row per pipeline stage, description = live state. Guards
@@ -100,7 +161,8 @@ export type HubAction = "scan" | "interview" | "emit" | "validate";
 // itself; Enter simply dispatches.
 export class HubScreen implements Component {
 	private readonly list: SelectList;
-	private readonly frame: Box;
+	private readonly listFrame: Box;
+	private active: HubAction = "scan";
 	private doneCalled = false;
 
 	constructor(
@@ -109,16 +171,15 @@ export class HubScreen implements Component {
 		private readonly done: (result: HubAction | undefined) => void,
 		private readonly theme: FrameTheme = PLAIN_FRAME_THEME,
 	) {
-		const items = [
-			{ value: "scan", label: "scan", description: scanDescription(status) },
-			{ value: "interview", label: "interview", description: interviewDescription(status) },
-			{ value: "emit", label: "emit", description: emitDescription(status) },
-			{ value: "validate", label: "validate · dev", description: validateDescription(status) },
-		];
+		const items = stageItems(status);
 		this.list = new SelectList(items, items.length, getSelectListTheme(), { overflowSearch: false });
 		this.list.onSelect = (item) => this.finish(item.value as HubAction);
 		this.list.onCancel = () => this.finish(undefined);
-		this.frame = frame(this.theme, {
+		this.list.onSelectionChange = (item) => {
+			this.active = item.value as HubAction;
+		};
+		// Narrow fallback (< 48 cols): single-pane framed list.
+		this.listFrame = frame(this.theme, {
 			title: `oma · ${status.project}`,
 			body: this.list,
 			footer: ["flow: scan → interview → emit → /advisor on", "enter open · esc close"],
@@ -140,12 +201,33 @@ export class HubScreen implements Component {
 	}
 
 	render(width: number): readonly string[] {
-		return this.frame.render(Math.max(1, width));
+		const safeWidth = Math.max(1, width);
+		// Split pane needs room for both columns; below that, fall back to the
+		// framed single-pane list.
+		if (safeWidth < 48) return this.listFrame.render(safeWidth);
+		const leftW = Math.min(28, Math.max(16, Math.floor(safeWidth * 0.42)));
+		const rightW = safeWidth - leftW - 3;
+		const leftLines = this.list.render(leftW);
+		const rightLines: string[] = [this.theme.fg("borderAccent", this.active), ""];
+		for (const line of wrapTextWithAnsi(STAGE_ABOUT[this.active], rightW)) rightLines.push(line);
+		rightLines.push("");
+		for (const line of wrapTextWithAnsi(this.theme.fg("dim", stageMeta(this.active, this.status)), rightW)) {
+			rightLines.push(line);
+		}
+		const footerRight =
+			this.status.report.state === "ready"
+				? `advisors $${this.status.report.totalCostUsd.toFixed(4)}`
+				: `${this.status.brief.kept} of ${this.status.brief.candidates} kept`;
+		return splitPane(this.theme, safeWidth, leftLines, rightLines, {
+			title: `oma · ${this.status.project}`,
+			footerLeft: "enter open · esc close",
+			footerRight,
+		});
 	}
 
 	invalidate(): void {
 		this.list.invalidate?.();
-		this.frame.invalidate();
+		this.listFrame.invalidate();
 	}
 
 	dispose(): void {}

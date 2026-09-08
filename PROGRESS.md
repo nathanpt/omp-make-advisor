@@ -1,13 +1,14 @@
 # PROGRESS
 
-Updated: 2026-09-08 (f-011 visual pass session)
+Updated: 2026-09-08 (f-012 split-pane session)
 
 ## Current repository state
 
-- Git repository initialized (`main`); twenty-two commits through the f-011 visual pass (foundation
+- Git repository initialized (`main`); twenty-three commits through the f-012 split-pane hub (foundation
   docs → package scaffold → f-001..f-003 slices → install-manifest fix → f-004/f-005
   emit+preview+precision → f-006 stepper + cutover → f-007 emit + simplify pass → f-008 probe
-  → f-008 validator + scored report → f-010 status hub + routing → f-011 boxed frames + gallery).
+  → f-008 validator + scored report → f-010 status hub + routing → f-011 boxed frames + gallery
+  → f-012 split-pane dashboard + aligned-facts detail).
 - Slices 1–4 complete and passing: `/oma scan` fans out the 4-lens scouts into
   `advisor-brief.md`; bare `/oma` opens the **status hub** (f-010, ADR-0002) — one row per
   stage with live state; `/oma interview` opens the **interview stepper** — one trap per screen with
@@ -31,6 +32,10 @@ Updated: 2026-09-08 (f-011 visual pass session)
   `src/frame.ts` (`frame()` + `FrameTheme` — real uiTheme in production, `PLAIN_FRAME_THEME`
   in tests/gallery); `npm run gallery` renders every styled screen at widths 60/80 for design
   iteration without launching omp.
+- f-012: the hub renders as a split-pane dashboard (Option B from the 2026-09-08 design
+  review) — left: stage rows with status-glyph icons; right: cursor-synced detail (what the
+  stage does + its artifact line); report detail uses the aligned-facts card (severity badge,
+  dotted rule, dim label column, model right-aligned).
 - Toolchain: npm + node ≥22 + `tsc --noEmit`; **bun runs both test suites** (`npm test`,
   `npm run test:tui`); no build step (`omp -e index.ts` loads TS directly). devDeps
   `@oh-my-pi/pi-coding-agent`/`-pi-tui` 18.1.12 vs omp runtime now **18.1.14** (was 18.1.11
@@ -63,8 +68,10 @@ Updated: 2026-09-08 (f-011 visual pass session)
 
 ## Active work
 
-None in flight. f-010 (hub + routing) and f-011 (visual pass) are complete and passing. Next
-per selection rule: `f-009` (doctor staleness nudge; deps f-004 ✓) — its detection feeds hub rows.
+None in flight. f-010 (hub + routing), f-011 (visual pass), and f-012 (split-pane hub +
+aligned-facts detail) are complete — f-011 remains `passes: false` on the markdown-pane step
+(deferral recorded in feature-list). Next per selection rule: `f-009` (doctor staleness nudge;
+deps f-004 ✓) — its detection feeds hub rows.
 
 
 ## Blockers and unknowns
@@ -607,13 +614,38 @@ Resolved this session:
   - Gates: `npm run typecheck` clean; `npm test` **28 pass**; `npm run test:tui` **13 pass**;
     `./init.sh` `All checks passed.`; `npm run probe` exit 0 `ready` (exit codes unpiped).
 
+- f-012 (2026-09-08, all pass) — split-pane hub + aligned-facts detail (user-picked Option B +
+  Detail i):
+  - **Layout**: `splitPane()` in `src/frame.ts` — captioned top border with `teeDown`, left
+    rows (25 cells) + divider + right rows (32 cells at 60 cols), `teeUp` rule, footer row with
+    right-aligned meta, plain bottom border. All junction glyphs come from `theme.boxRound`
+    (rounded boxes reuse sharp tees per theme-class); `FrameTheme.fg` gained
+    `success|warning|error` (verified ThemeColor tokens) for severity/verdict tones.
+  - **HubScreen**: SelectList `icon` column carries the status glyph (✓/⚠/—) — discovered the
+    hard way that the label+description two-column layout only activates at width > 40
+    (select-list.ts:445), so descriptions can't survive a 25-cell pane; labels are compact
+    (`scan · 6 traps`, `interview · 4/6`), rich state moved to the right pane
+    (STAGE_ABOUT/stageMeta). `list.onSelectionChange` drives the right pane; footer right
+    shows `advisors $X` (report ready) or the kept count. Below 48 cols: framed single-pane
+    fallback.
+  - **ReportScreen detail**: `buildDetailRows` — `● SEVERITY · slug` badge (severity-toned),
+    wrapped note, `dottedRule()` (boxDotted.horizontal), dim label column
+    (`keywords/hits/cost`, labels padEnd 11 before coloring so widths stay ANSI-safe), hits
+    in `success` when present, model right-aligned. Headless summary keeps the LONG
+    descriptions (D3 stdout); PTY rows stay telegraphic.
+  - Live smoke (hub-hosted omp 18.1.14, seeded repo): `/oma` → split pane with true state;
+    DOWN moved the cursor and the right pane flipped to the interview copy; Esc closed cleanly.
+  - Gates: `npm run typecheck` clean; `npm test` **28 pass**; `npm run test:tui` **13 pass**;
+    `./init.sh` `All checks passed.` (exit codes unpiped).
+
 ## Next useful move
 
 Start `f-009` (doctor staleness nudge; deps f-004 ✓). The detection engine is now
 `readHubStatus` — extend it with the staleness signal (`verifyEvidenceAnchors` reuse at
 interview/doctor time per the carried note) and surface warning rows in the hub. Headless
-variant per constraint 3. `f-011` (visual pass) is done — its gallery (`npm run gallery`)
-remains the tool for further styling experiments.
+variant per constraint 3. `f-011`/`f-012` (visual pass, split-pane hub) are done — the gallery
+(`npm run gallery`) remains the tool for further styling experiments; interview/preview
+restyle can adopt the same frame/split language when picked up.
 
 - f-008 probe (2026-09-08, live): conc-map fixture + emitted WATCHDOG pair;
   `timeout 300 omp -p --advisor --auto-approve "add dropBatch() deleting from batchIndex"`.

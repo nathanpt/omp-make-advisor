@@ -177,6 +177,23 @@
       "priority": 11,
       "dependencies": ["f-010"],
       "source": "DESIGN.md §10 Next; user design session 2026-09-08"
+    },
+    {
+      "id": "f-012",
+      "category": "functional",
+      "description": "Split-pane hub dashboard (cursor-synced right pane) + aligned-facts report detail card",
+      "steps": [
+        "splitPane() helper: captioned top border with tee junctions, left/right columns, teeUp rule, footer with right-aligned meta",
+        "Hub left pane: status glyph in SelectList icon column, compact labels; right pane switches with onSelectionChange",
+        "Report detail card: severity-toned badge, dotted rule, dim label column, model right-aligned",
+        "Narrow-width fallback (framed single pane below 48 cols)",
+        "Snapshot tests updated; live smoke incl. cursor-synced pane switch"
+      ],
+      "passes": true,
+      "evidence": "User design review 2026-09-08 picked Option B + Detail i from compared mockups. src/frame.ts splitPane() (boxRound tee junctions, FrameTheme.fg extended with verified success/warning/error tokens, boxDotted rule). HubScreen: stageItems() puts status glyphs in the SelectList icon column (label+description columns do not render below width 40 — select-list.ts:445 — discovered and worked around with icon+compact label); onSelectionChange drives the right pane (STAGE_ABOUT + stageMeta); footer right shows advisors cost or kept count; <48 cols falls back to the framed single pane. ReportScreen.buildDetailRows(): severity-toned badge, wrapped note, dotted rule, dim label column (padEnd before coloring for ANSI-safe widths), hits in success tone, model right-aligned. test/hub.test.ts + test/tui hub+report updated (28 unit + 13 TUI pass); gallery renders the split pane at 60+80; live smoke in omp 18.1.14 seeded repo: split hub with true state, DOWN flipped the right pane to interview copy, Esc closed cleanly; ./init.sh All checks passed.",
+      "priority": 12,
+      "dependencies": ["f-010", "f-011"],
+      "source": "User design session 2026-09-08 (Option B + Detail i)"
     }
   ]
 }

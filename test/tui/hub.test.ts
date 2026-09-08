@@ -28,13 +28,12 @@ test("hub: header, four status rows, footer; enter dispatches scan; esc cancels 
 		const events = await host.waitUntil((es) => es.some((e) => (e as Event).type === "frame"));
 		frameWith(events, "oma · demo");
 		frameWith(events, "enter open · esc close");
-		frameWith(events, "scan");
-		frameWith(events, "✓ advisor-brief · 6");
-		frameWith(events, "✓ 4 of 6 kept");
-		frameWith(events, "⚠ sidecars to move");
-		frameWith(events, "validate · dev");
-		frameWith(events, "✓ report 09-08 $0.06");
-		frameWith(events, "flow: scan → interview → emit → /advisor on");
+		frameWith(events, "scan · 6 traps");
+		frameWith(events, "interview · 4/6");
+		frameWith(events, "emit · sidecars");
+		frameWith(events, "4 read-only scouts fan out");
+		frameWith(events, "advisor-brief.md · 6 traps");
+		frameWith(events, "advisors $0.0630");
 
 		// Enter on the preselected first row dispatches scan.
 		host.write("\r");

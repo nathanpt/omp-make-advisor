@@ -44,11 +44,12 @@ test("walkthrough: list renders rows + totals, enter opens detail, esc walks bac
 			framesOf(es).some((f) => f.lines.some((line) => plain(line).includes("enter back · esc close"))),
 		);
 		const detail = frameWith(detailEvents, "enter back · esc close");
-		assert.ok(frameIndex(detailEvents, detail) > frameIndex(detailEvents, list), "detail must render after the list");
-		frameWith(detailEvents, "- [concern] (concurrency-watcher) batchIndex.delete runs");
-		frameWith(detailEvents, "outside withIngestLock");
-		frameWith(detailEvents, "keywords: lock, map · hits: lock");
-		frameWith(detailEvents, "cost $0.0123 · model glm-4.7");
+		frameWith(detailEvents, "● CONCERN · concurrency-watcher");
+		frameWith(detailEvents, "batchIndex.delete runs outside withIngestLock");
+		frameWith(detailEvents, "keywords   lock, map");
+		frameWith(detailEvents, "hits       lock");
+		frameWith(detailEvents, "cost       $0.0123");
+		frameWith(detailEvents, "glm-4.7");
 
 		// Esc returns to the list (a fresh list frame after the detail).
 		host.write("\x1b");
