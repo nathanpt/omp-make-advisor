@@ -152,7 +152,7 @@ export function readEvidenceContext(
 	if (all.length > 0 && all[all.length - 1] === "") all.pop();
 	const start = ranged ? Number(ranged[2]) : 1;
 	const end = Math.min(ranged ? (ranged[3] ? Number(ranged[3]) : Number(ranged[2])) : all.length, all.length);
-	if (end < start) return null; // start past EOF (or inverted range)
+	if (start < 1 || end < start) return null; // degenerate anchor (:0, inverted, start past EOF)
 	const from = Math.max(1, start);
 	const lines: string[] = [];
 	for (let no = from; no <= end && lines.length < maxLines; no += 1) {
@@ -165,7 +165,9 @@ export function readEvidenceContext(
 // hallucinate anchors, and the emit is where that stops being cosmetic.
 // Evidence forms: `path`, `path:line`, `path:line-line` (relative to cwd).
 // Bare paths may name a directory (an area guard); ranges require a readable
-// regular file whose line count covers them.
+// regular file, 1-based ordered bounds, and a line count that covers them —
+// counting real lines only (a trailing newline is not a line), the same
+// semantics readEvidenceContext renders by.
 export interface AnchorFailure {
 	id: string;
 	evidence: string;
@@ -184,14 +186,21 @@ export function verifyEvidenceAnchors(
 		try {
 			const isFile = statSync(abs).isFile();
 			if (ranged && !isFile) throw new Error("not a regular file");
-			if (isFile) lines = readFileSync(abs, "utf8").split("\n").length;
+			// Read only when the line count is consumed; a bare path just has to
+			// exist (dirs are legitimate area guards).
+			if (ranged && isFile) {
+				const all = readFileSync(abs, "utf8").split("\n");
+				if (all.length > 0 && all[all.length - 1] === "") all.pop();
+				lines = all.length;
+			}
 		} catch {
 			failures.push({ id: candidate.id, evidence: candidate.evidence, reason: "unresolved" });
 			continue;
 		}
 		if (ranged) {
-			const end = ranged[3] ? Number(ranged[3]) : Number(ranged[2]);
-			if (end > lines) {
+			const start = Number(ranged[2]);
+			const end = ranged[3] ? Number(ranged[3]) : start;
+			if (start < 1 || start > end || end > lines) {
 				failures.push({ id: candidate.id, evidence: candidate.evidence, reason: "out-of-range" });
 			}
 		}

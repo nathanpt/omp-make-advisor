@@ -103,20 +103,28 @@ const ANCHOR_CASES: readonly CandidateTrap[] = [
 	{ id: "ok-range", title: "t", evidence: "ingest.ts:1-3" },
 	{ id: "ok-bare", title: "t", evidence: "ingest.ts" },
 	{ id: "ok-dir", title: "t", evidence: "db" },
+	{ id: "ok-trailing-eof", title: "t", evidence: "trail.ts:1-3" },
 	{ id: "ghost", title: "t", evidence: "src/ghost.ts:10" },
 	{ id: "past-eof", title: "t", evidence: "ingest.ts:2-9" },
 	{ id: "dir-range", title: "t", evidence: "db:1-2" },
+	{ id: "phantom-eof", title: "t", evidence: "trail.ts:4" },
+	{ id: "inverted", title: "t", evidence: "ingest.ts:3-1" },
+	{ id: "zero", title: "t", evidence: "ingest.ts:0" },
 ];
 
-test("verifyEvidenceAnchors: exact-EOF ranges and bare paths pass; ghost, past-EOF, and ranged dirs fail", () => {
+test("verifyEvidenceAnchors: exact-EOF ranges and bare paths pass; ghost, past-EOF, ranged dirs, phantom-EOF, inverted, and zero anchors fail", () => {
 	const dir = mkdtempSync(join(tmpdir(), "oma-anchors-"));
 	try {
-		writeFileSync(join(dir, "ingest.ts"), "line1\nline2\nline3"); // 3 lines
+		writeFileSync(join(dir, "ingest.ts"), "line1\nline2\nline3"); // 3 lines, no trailing newline
+		writeFileSync(join(dir, "trail.ts"), "a\nb\nc\n"); // 3 lines WITH trailing newline
 		mkdirSync(join(dir, "db"));
 		assert.deepEqual(verifyEvidenceAnchors(dir, ANCHOR_CASES), [
 			{ id: "ghost", evidence: "src/ghost.ts:10", reason: "unresolved" },
 			{ id: "past-eof", evidence: "ingest.ts:2-9", reason: "out-of-range" },
 			{ id: "dir-range", evidence: "db:1-2", reason: "unresolved" },
+			{ id: "phantom-eof", evidence: "trail.ts:4", reason: "out-of-range" },
+			{ id: "inverted", evidence: "ingest.ts:3-1", reason: "out-of-range" },
+			{ id: "zero", evidence: "ingest.ts:0", reason: "out-of-range" },
 		]);
 	} finally {
 		rmSync(dir, { recursive: true, force: true });
@@ -149,6 +157,9 @@ test("readEvidenceContext: ranges, caps, bare files, and non-file evidence", () 
 			lines: ["l18", "l19", "l20"],
 			more: 0,
 		});
+		// Degenerate anchors render no context.
+		assert.equal(readEvidenceContext(dir, "src.ts:0"), null);
+		assert.equal(readEvidenceContext(dir, "src.ts:5-3"), null);
 		// Bare file path previews from the top.
 		assert.deepEqual(readEvidenceContext(dir, "src.ts"), {
 			startLine: 1,

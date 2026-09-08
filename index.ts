@@ -1,10 +1,8 @@
 import type { ExtensionAPI, ExtensionCommandContext } from "@oh-my-pi/pi-coding-agent";
-import { existsSync } from "node:fs";
-import { join } from "node:path";
 import { InterviewStepper, type InterviewDecision } from "./src/interview.js";
 import { readBrief, verifyEvidenceAnchors, writeBrief, readEvidenceContext } from "./src/brief.js";
 import { buildScanPrompt } from "./src/scan.js";
-import { buildWatchdogMd, emitWatchdog, WATCHDOG_FILENAME } from "./src/emit.js";
+import { buildWatchdogMd, emitWatchdog, watchdogTargetName, WATCHDOG_FILENAME, WATCHDOG_SIDECAR_FILENAME } from "./src/emit.js";
 import { WatchdogPreview } from "./src/preview.js";
 
 export default function omaExtension(pi: ExtensionAPI): void {
@@ -99,9 +97,9 @@ export default function omaExtension(pi: ExtensionAPI): void {
 			return;
 		}
 		const content = buildWatchdogMd(candidates);
-		// The preview header names the file emitWatchdog will actually write;
+		// The header names the file emitWatchdog will actually write;
 		// emitWatchdog's own existsSync stays authoritative at write time.
-		const targetName = existsSync(join(ctx.cwd, WATCHDOG_FILENAME)) ? "WATCHDOG.oma.md" : "WATCHDOG.md";
+		const targetName = watchdogTargetName(ctx.cwd);
 		if (ctx.hasUI) {
 			const apply = await ctx.ui.custom<boolean | undefined>(
 				(_tui, _theme, keybindings, done) => new WatchdogPreview(content, targetName, keybindings, done),
@@ -117,12 +115,11 @@ export default function omaExtension(pi: ExtensionAPI): void {
 		if (!ctx.hasUI) return;
 		ctx.ui.notify(
 			result.besideStanding
-				? "oma: wrote WATCHDOG.oma.md beside standing WATCHDOG.md — review, then move into place"
-				: `oma: wrote WATCHDOG.md — ${kept.length} traps`,
+				? `oma: wrote ${WATCHDOG_SIDECAR_FILENAME} beside standing ${WATCHDOG_FILENAME} — review, then move into place`
+				: `oma: wrote ${WATCHDOG_FILENAME} — ${kept.length} traps`,
 			"info",
 		);
 	};
-
 
 	const commandOptions = {
 		description: "Interview the project and emit its watchdogs (oma)",
@@ -163,20 +160,20 @@ export default function omaExtension(pi: ExtensionAPI): void {
 			ctx.ui.notify("oma: scan finished but advisor-brief.md was not written", "warning");
 			return;
 		}
-	const { candidates, skipped } = read.result;
-	ctx.ui.notify(
-		`oma: scan complete — ${candidates.length} candidates in advisor-brief.md${skipped ? ` (${skipped} skipped as malformed)` : ""}`,
-		"info",
-	);
-	// Liveness check: parseBrief validates grammar only — a hallucinated anchor
-	// would otherwise flow silently into the interview and the WATCHDOG emit.
-	const unanchored = verifyEvidenceAnchors(ctx.cwd, candidates);
-	if (unanchored.length > 0) {
-		const ids = unanchored.map((failure) => failure.id).join(", ");
+		const { candidates, skipped } = read.result;
 		ctx.ui.notify(
-			`oma: warning — ${unanchored.length} candidate${unanchored.length === 1 ? "" : "s"} cite evidence that does not resolve (${ids}) — drop or rescan`,
-			"warning",
+			`oma: scan complete — ${candidates.length} candidates in advisor-brief.md${skipped ? ` (${skipped} skipped as malformed)` : ""}`,
+			"info",
 		);
-	}
+		// Liveness check: parseBrief validates grammar only — a hallucinated anchor
+		// would otherwise flow silently into the interview and the WATCHDOG emit.
+		const unanchored = verifyEvidenceAnchors(ctx.cwd, candidates);
+		if (unanchored.length > 0) {
+			const ids = unanchored.map((failure) => failure.id).join(", ");
+			ctx.ui.notify(
+				`oma: warning — ${unanchored.length} candidate${unanchored.length === 1 ? "" : "s"} cite evidence that does not resolve (${ids}) — drop or rescan`,
+				"warning",
+			);
+		}
 	});
 }

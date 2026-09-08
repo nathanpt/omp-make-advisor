@@ -29,6 +29,12 @@ export function buildWatchdogMd(candidates: readonly BriefCandidate[]): string {
 	].join("\n") + "\n";
 }
 
+// The name emitWatchdog will write — shared by the preview header and the
+// completion notify so the prediction and the write decision cannot diverge.
+export function watchdogTargetName(cwd: string): string {
+	return existsSync(join(cwd, WATCHDOG_FILENAME)) ? WATCHDOG_SIDECAR_FILENAME : WATCHDOG_FILENAME;
+}
+
 // Never mutates a standing WATCHDOG.md — writes the sidecar beside it.
 // Write failures propagate (surfaced by omp's command error handling).
 export function emitWatchdog(cwd: string, content: string): EmitResult {

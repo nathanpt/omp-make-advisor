@@ -1,6 +1,7 @@
 import { appendFileSync } from "node:fs";
 import { ProcessTerminal, TUI } from "@oh-my-pi/pi-tui";
 import type { Component } from "@oh-my-pi/pi-tui";
+import type { KeybindingsLike } from "../../src/keybindings.js";
 
 // Records frame/disposed events around a mounted component. Frames are
 // deduped on content so render polls don't flood the events file, and
@@ -54,4 +55,21 @@ export function mountHost(wrapped: Component, eventsPath: string): () => void {
 		tui.stop();
 		process.exit(0);
 	};
+}
+
+// Standard PTY-host wiring shared by every host script: stub keybindings
+// (app.interrupt stays a production-only concern, so confirm/cancel ride the
+// literal-key paths), done-event logging, dispose, and the settle-delayed
+// stop. `factory` builds the component under test from the stub and done.
+export function runOverlayHost<T>(
+	factory: (keybindings: KeybindingsLike, done: (result: T | undefined) => void) => Component,
+	eventsPath: string,
+): void {
+	const shutdown = (result: T | undefined) => {
+		appendFileSync(eventsPath, JSON.stringify({ type: "done", result: result ?? null }) + "\n");
+		wrapped.dispose();
+		setTimeout(stop, 100);
+	};
+	const wrapped = new Instrumented(factory({ matches: () => false }, shutdown), eventsPath);
+	const stop = mountHost(wrapped, eventsPath);
 }

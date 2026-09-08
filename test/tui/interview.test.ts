@@ -1,86 +1,6 @@
 import { test } from "bun:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-
-interface SpawnedHost {
-	write(data: string): void;
-	waitUntil(predicate: (events: unknown[]) => boolean, timeoutMs?: number): Promise<unknown[]>;
-	/** Snapshot of the events file as it stands right now. */
-	readAll(): unknown[];
-	exited: Promise<number>;
-	/** Kill the host (no-op after exit) and remove its temp events file. */
-	cleanup(): void;
-}
-
-function spawnHost(config?: string): SpawnedHost {
-	const dir = mkdtempSync(join(tmpdir(), "oma-tui-"));
-	const eventsPath = join(dir, "events.jsonl");
-	const proc = Bun.spawn({
-		cmd: [
-			process.execPath,
-			"run",
-			join(import.meta.dir, "interview-host.ts"),
-			eventsPath,
-			...(config ? [config] : []),
-		],
-		pty: true,
-		stdin: "pipe",
-		stdout: "ignore",
-		stderr: "inherit",
-		env: { ...process.env, COLUMNS: "60", LINES: "20" },
-	});
-	const readEvents = (): unknown[] => {
-		let raw: string;
-		try {
-			raw = readFileSync(eventsPath, "utf8");
-		} catch {
-			return [];
-		}
-		const events: unknown[] = [];
-		for (const line of raw.split("\n")) {
-			if (!line) continue;
-			try {
-				events.push(JSON.parse(line));
-			} catch {
-				// Torn tail from an in-flight append; the next poll re-reads it whole.
-			}
-		}
-		return events;
-	};
-	const waitUntil = async (predicate: (events: unknown[]) => boolean, timeoutMs = 5000): Promise<unknown[]> => {
-		const deadline = Date.now() + timeoutMs;
-		for (;;) {
-			const events = readEvents();
-			if (predicate(events)) return events;
-			if (proc.exitCode !== null) {
-				throw new Error(`host exited (code ${proc.exitCode}) before satisfying predicate; events: ${JSON.stringify(events)}`);
-			}
-			if (Date.now() > deadline) throw new Error(`timeout waiting for events; got: ${JSON.stringify(events)}`);
-			// Real delay by necessity: the awaited condition is JSONL output written
-			// by an external PTY child process, which fake timers cannot advance.
-			const { promise: tick, resolve: ticked } = Promise.withResolvers<void>();
-			setTimeout(ticked, 100);
-			await tick;
-		}
-	};
-	return {
-		write: proc.stdin.write.bind(proc.stdin),
-		waitUntil,
-		readAll: readEvents,
-		exited: proc.exited,
-		cleanup: () => {
-			proc.kill();
-			rmSync(dir, { recursive: true, force: true });
-		},
-	};
-}
-
-interface Event {
-	type: string;
-	[key: string]: unknown;
-}
+import { spawnHost, type Event } from "./spawn.js";
 
 interface FrameEvent extends Event {
 	lines: string[];
@@ -108,10 +28,10 @@ function frameWith(events: readonly unknown[], substring: string): FrameEvent {
 	return frame;
 }
 
-// The cursor glyph follows the host's symbol preset (ASCII ">"); the cursor
-// row is the choice row without the two-space indent.
+// The host's symbol preset renders the cursor as ASCII "> "; the cursor row
+// is the choice row starting with that glyph.
 const cursorOn = (frame: FrameEvent, word: "keep" | "edit" | "drop"): boolean =>
-	frame.lines.some((line) => /^\S/.test(plain(line)) && new RegExp(`\\b${word}\\b`).test(plain(line)));
+	frame.lines.some((line) => plain(line).startsWith("> ") && new RegExp(`\\b${word}\\b`).test(plain(line)));
 
 /** Wait for a decision screen rendered strictly after frame index `after`. */
 const decisionScreenAfter = (events: readonly unknown[], after: number): FrameEvent | undefined =>
@@ -120,7 +40,7 @@ const decisionScreenAfter = (events: readonly unknown[], after: number): FrameEv
 		.find((f) => f.lines.some((line) => /^Trap \d+\/\d+ /.test(plain(line))));
 
 test("walkthrough: one trap per screen, evidence inline, progress advances", async () => {
-	const host = spawnHost();
+	const host = spawnHost("interview-host.ts");
 	try {
 		const events = await host.waitUntil((es) => es.some((e) => (e as Event).type === "frame"));
 		const size = events.find((e) => e.type === "size");
@@ -188,7 +108,7 @@ test("walkthrough: one trap per screen, evidence inline, progress advances", asy
 });
 
 test("drop choice records a dropped decision", async () => {
-	const host = spawnHost();
+	const host = spawnHost("interview-host.ts");
 	try {
 		await host.waitUntil((es) => es.some((e) => (e as Event).type === "frame"));
 		host.write("\x1b[B"); // keep → edit
@@ -213,7 +133,7 @@ test("drop choice records a dropped decision", async () => {
 });
 
 test("cancel flow", async () => {
-	const host = spawnHost();
+	const host = spawnHost("interview-host.ts");
 	try {
 		await host.waitUntil((es) => es.some((e) => (e as Event).type === "frame"));
 		host.write("\x1b");
@@ -230,7 +150,7 @@ test("cancel flow", async () => {
 });
 
 test("preload: drop status preselects the drop row", async () => {
-	const host = spawnHost(JSON.stringify({ dropIds: ["t1"] }));
+	const host = spawnHost("interview-host.ts", [JSON.stringify({ dropIds: ["t1"] })]);
 	try {
 		const events = await host.waitUntil((es) => es.some((e) => (e as Event).type === "frame"));
 		const first = frameWith(events, "Trap 1/3");
@@ -252,7 +172,7 @@ test("preload: drop status preselects the drop row", async () => {
 });
 
 test("edit flow: rewording round-trips into the decision", async () => {
-	const host = spawnHost();
+	const host = spawnHost("interview-host.ts");
 	try {
 		await host.waitUntil((es) => es.some((e) => (e as Event).type === "frame"));
 		host.write("\x1b[B"); // keep → edit
@@ -298,7 +218,7 @@ test("edit flow: rewording round-trips into the decision", async () => {
 });
 
 test("edit esc reverts the rewording", async () => {
-	const host = spawnHost();
+	const host = spawnHost("interview-host.ts");
 	try {
 		await host.waitUntil((es) => es.some((e) => (e as Event).type === "frame"));
 		host.write("\x1b[B");
@@ -334,7 +254,7 @@ test("edit esc reverts the rewording", async () => {
 });
 
 test("edit: empty submit is ignored, edit stays live", async () => {
-	const host = spawnHost();
+	const host = spawnHost("interview-host.ts");
 	try {
 		await host.waitUntil((es) => es.some((e) => (e as Event).type === "frame"));
 		host.write("\x1b[B");

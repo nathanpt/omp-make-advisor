@@ -1,7 +1,6 @@
-import { appendFileSync } from "node:fs";
 import type { BriefCandidate, EvidenceContext } from "../../src/brief.js";
 import { InterviewStepper, type InterviewDecision } from "../../src/interview.js";
-import { Instrumented, mountHost } from "./hostlib.js";
+import { runOverlayHost } from "./hostlib.js";
 
 // Watch-rule titles: a trap is a future-facing rule for the advisor, not a
 // bug report. Mirrors the shape scouts write into advisor-brief.md.
@@ -60,15 +59,7 @@ const candidates = CANDIDATES.map((c) => ({ ...c, status: dropIds.has(c.id) ? ("
 const evidence: ReadonlyMap<string, EvidenceContext | null> = new Map(
 	Object.entries({ ...DEFAULT_EVIDENCE, ...config.evidence }),
 );
-
-const shutdown = (result: InterviewDecision[] | undefined) => {
-	appendFileSync(eventsPath, JSON.stringify({ type: "done", result: result ?? null }) + "\n");
-	wrapped.dispose();
-	setTimeout(stop, 100);
-};
-// Stub keybindings deliberately disable app.interrupt in the host: Esc-cancel
-// is exercised through SelectList's own tui.select.cancel path, and interrupt
-// matching stays a production-only concern.
-const stepper = new InterviewStepper(candidates, evidence, { matches: () => false }, shutdown);
-const wrapped = new Instrumented(stepper, eventsPath);
-const stop = mountHost(wrapped, eventsPath);
+runOverlayHost<InterviewDecision[]>(
+	(keybindings, done) => new InterviewStepper(candidates, evidence, keybindings, done),
+	eventsPath,
+);

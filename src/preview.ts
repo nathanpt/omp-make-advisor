@@ -31,9 +31,9 @@ export class WatchdogPreview implements Component {
 			this.finish(undefined);
 			return;
 		}
-		// Normalize raw PTY CR, same belt-and-braces as picker.ts; the literal
-		// "\n" / "\x1b" fallbacks keep confirm/cancel working when a user
-		// remaps the select actions away from enter/escape.
+		// Normalize raw PTY CR, same belt-and-braces as interview.ts's
+		// handleInput; the literal "\n" / "\x1b" fallbacks keep confirm/cancel
+		// working when a user remaps the select actions away from enter/escape.
 		const key = data === "\r" ? "\n" : data;
 		if (key === "\n" || this.keybindings.matches(key, "tui.select.confirm")) {
 			this.finish(true);

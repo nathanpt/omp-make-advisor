@@ -1,6 +1,5 @@
-import { appendFileSync } from "node:fs";
 import { WatchdogPreview } from "../../src/preview.js";
-import { Instrumented, mountHost } from "./hostlib.js";
+import { runOverlayHost } from "./hostlib.js";
 
 const eventsPath = process.argv[2];
 if (!eventsPath) throw new Error("usage: bun run test/tui/preview-host.ts <events.jsonl>");
@@ -23,13 +22,4 @@ const SAMPLE = [
 	"- **Pin the ingest worker count in config before scaling horizontally** (src/ingest/worker.ts:12-30)",
 ].join("\n");
 
-const shutdown = (apply: boolean | undefined) => {
-	appendFileSync(eventsPath, JSON.stringify({ type: "done", result: apply ?? null }) + "\n");
-	wrapped.dispose();
-	setTimeout(stop, 100);
-};
-// Same stub discipline as host.ts: interrupt matching stays production-only,
-// so confirm/cancel ride the literal-key paths exercised here.
-const preview = new WatchdogPreview(SAMPLE, "WATCHDOG.md", { matches: () => false }, shutdown);
-const wrapped = new Instrumented(preview, eventsPath);
-const stop = mountHost(wrapped, eventsPath);
+runOverlayHost<boolean>((keybindings, done) => new WatchdogPreview(SAMPLE, "WATCHDOG.md", keybindings, done), eventsPath);

@@ -329,6 +329,45 @@ Resolved this session:
     Esc cancelled. Bare `/oma` provably opened the stepper on both invocations; re-check when
     driving omp 18.1.14 via hub text sends.
 
+- Simplify pass (2026-09-08, post-f-006): three read-only reviewer lanes (reuse; quality;
+  efficiency) over `d24a122..HEAD` — which includes the f-004/f-005 work that had been left
+  uncommitted and was swept into the slice-3 commit by its `git add -A` (commit-hygiene note;
+  no history rewrite performed). Applied:
+  - **Anchor semantics aligned** (all three lanes converged): `verifyEvidenceAnchors` now
+    counts real lines only (trailing newline ≠ a line — a hallucinated `:1-4` on a 3-line
+    file previously passed liveness while the interview clamped it), validates `start ≥ 1`
+    and `start ≤ end` (inverted `:5-2` and `:0` previously passed silently), and skips the
+    file read entirely for bare-path candidates whose line count was unused.
+    `readEvidenceContext` returns null for `start < 1` (was a degenerate non-null context,
+    contradicting its doc). Matrix extended: trailing-newline exact-EOF passes, phantom-EOF /
+    inverted / zero fail, `readEvidenceContext` degenerate cases pinned.
+  - **Sidecar decision deduplicated**: `watchdogTargetName(cwd)` exported from emit.ts;
+    index.ts's preview header and completion notify interpolate
+    `WATCHDOG_FILENAME`/`WATCHDOG_SIDECAR_FILENAME` instead of hardcoded strings.
+  - **PTY harness deduplicated**: `test/tui/spawn.ts` (SpawnedHost/spawnHost/Event — the
+    ~70-line spawn/poll/waitUntil block duplicated verbatim across interview and preview
+    suites) and `runOverlayHost` in hostlib.ts (stub keybindings + done-event + dispose +
+    settle-delay stop shared by both host scripts). `cursorOn` tightened to the actual `> `
+    cursor-row prefix (was any unindented line containing the word).
+  - Clarity: derived `KEEP_ROW`/`DROP_ROW` replace magic `? 2 : 0` in buildList;
+    index.ts agent_end block re-indented + double blank collapsed; stale `picker.ts`
+    references in preview.ts and preview-host.ts comments fixed; index/index≡decisions
+    invariants and exitEdit's save-and-revert behavior documented; unused
+    existsSync/path-join imports dropped from index.ts.
+  Rejected: merging the runInterview/runEmit read-guard prologues (headless behaviors
+  genuinely differ — a shared helper needs mode flags), folding `editing` into
+  `input !== null` / dropping empty `dispose()` overrides / removing the `[...CHOICES]`
+  defensive spread (intentional explicitness + TUI discipline), a structural merge of
+  verifyEvidenceAnchors + readEvidenceContext into one core (different output shapes; the
+  shared semantics are now pinned by tests instead), `padding()` over `" ".repeat` (style).
+  Verification: typecheck clean; `npm test` 12 pass (extended anchor matrix);
+  `npm run test:tui` 10 pass on the shared harness; probe exit 0 `ready` (unpiped);
+  `./init.sh` INIT_EXIT=0 (unpiped). Live smoke on this repo's own 11-candidate brief:
+  10/11 anchors pass under the stricter rules; the single failure is `conc-3` citing
+  `src/picker.ts:76-88` — a file deleted by the f-006 cutover, correctly flagged
+  unresolved (zero false positives; f-009's staleness signal firing on real data —
+  rescan or drop conc-3 when next touching the brief).
+
 ## Next useful move
 
 Start `f-007` (WATCHDOG.yml roster emission: 2-3 starter roles with model/tool suggestions,

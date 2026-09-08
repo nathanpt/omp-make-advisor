@@ -19,21 +19,28 @@ const CHOICES: readonly { value: Choice; label: string; description: string }[] 
 	{ value: "edit", label: "edit", description: "reword the rule text" },
 	{ value: "drop", label: "drop", description: "exclude from the brief" },
 ];
-
 // The bar caps at 12 cells so `Trap 12/12 ▮… · enter select · esc cancel`
 // still fits the narrowest supported terminal (60 cols).
 const MAX_BAR_CELLS = 12;
 
+// Row positions in CHOICES; buildList preselects by status and must never
+// land on the edit row. Derived, not positional, so reordering CHOICES
+// cannot silently break preselection.
+const KEEP_ROW = CHOICES.findIndex((c) => c.value === "keep");
+const DROP_ROW = CHOICES.findIndex((c) => c.value === "drop");
+
 export class InterviewStepper implements Component {
 	private titles: string[];
 	private readonly decisions: InterviewDecision[] = [];
+	// `index` advances in lockstep with decisions.length (one decision per
+	// non-edit choice); `editing` mirrors `input !== null` and both flip
+	// together in enterEdit/exitEdit (single-threaded input dispatch).
 	private index = 0;
 	private editing = false;
 	private input: Input | null = null;
 	private list: SelectList;
 	private doneCalled = false;
 	private readonly selectListTheme = getSelectListTheme();
-
 	constructor(
 		private readonly candidates: readonly BriefCandidate[],
 		private readonly evidence: ReadonlyMap<string, EvidenceContext | null>,
@@ -46,9 +53,8 @@ export class InterviewStepper implements Component {
 
 	private buildList(): SelectList {
 		const list = new SelectList([...CHOICES], CHOICES.length, this.selectListTheme, { overflowSearch: false });
-		// Preselect the row matching the brief's recorded status (edit sits
-		// between; it is never a preselection target).
-		list.setSelectedIndex(this.candidates[this.index]?.status === "drop" ? 2 : 0);
+		// Preselect the row matching the brief's recorded status.
+		list.setSelectedIndex(this.candidates[this.index]?.status === "drop" ? DROP_ROW : KEEP_ROW);
 		list.onSelect = (item) => this.choose(item.value as Choice);
 		list.onCancel = () => this.finish(undefined);
 		return list;
@@ -92,8 +98,9 @@ export class InterviewStepper implements Component {
 	private exitEdit(): void {
 		this.editing = false;
 		this.input = null;
-		// Rebuild so the cursor resets to the row matching the recorded status —
-		// after saving, the natural next action is keep or drop.
+		// Rebuild on both exits (save and revert) so the cursor resets to the
+		// row matching the recorded status — the next natural action is keep
+		// or drop, never a second edit.
 		this.list = this.buildList();
 	}
 
