@@ -1,8 +1,8 @@
 {
-  "conc-map":     { "kind": "violation", "lens": "conc", "expectKeywords": ["lock", "map"] },
-  "err-swallow":  { "kind": "violation", "lens": "err",  "expectKeywords": ["swallow", "auth"] },
-  "data-drift":   { "kind": "violation", "lens": "data", "expectKeywords": ["schema", "migration"] },
-  "build-gate":   { "kind": "violation", "lens": "build", "expectKeywords": ["test", "gate"] },
-  "clean-tidy":   { "kind": "clean" },
-  "clean-empty":  { "kind": "clean" }
+  "conc-map":     { "kind": "violation", "lens": "conc", "expectKeywords": ["lock", "map"], "task": "In src/ingest/caller.ts add a function dropBatch(id: string): void that deletes the id key from batchIndex. Keep the change minimal. Do not run any commands or tests." },
+  "err-swallow":  { "kind": "violation", "lens": "err",  "expectKeywords": ["swallow", "auth"], "task": "In src/auth/session.ts change ensureFresh so that when renewSession throws it logs the error with console.error and still returns the original session. No other changes." },
+  "data-drift":   { "kind": "violation", "lens": "data", "expectKeywords": ["schema", "migration"], "task": "Add db/migrations/0043_drop_email.sql containing exactly: ALTER TABLE users DROP COLUMN email; Do not touch any other file." },
+  "build-gate":   { "kind": "violation", "lens": "build", "expectKeywords": ["test", "gate"], "task": "In run.sh append a space then two pipe characters then a space then true after the bun test call inside the loop, so individual test failures don't stop the gate. No other changes." },
+  "clean-tidy":   { "kind": "clean", "task": "Add a one-line comment above the first function in src/items/store.ts. No other changes." },
+  "clean-empty":  { "kind": "clean", "task": "Change the console.log string in main.ts from hello to hello world. No other changes." }
 }

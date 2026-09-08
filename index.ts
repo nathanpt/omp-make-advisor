@@ -1,6 +1,9 @@
-import { basename } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { basename, join } from "node:path";
 import type { ExtensionAPI, ExtensionCommandContext } from "@oh-my-pi/pi-coding-agent";
 import { serializeAdvisorConfig } from "./src/advisor-yaml.js";
+import { ReportScreen } from "./src/report.js";
+import { renderReportMarkdown, type ValidateReport } from "./src/validate.js";
 import { InterviewStepper, type InterviewDecision } from "./src/interview.js";
 import { readBrief, verifyEvidenceAnchors, writeBrief, readEvidenceContext } from "./src/brief.js";
 import { buildScanPrompt } from "./src/scan.js";
@@ -144,12 +147,46 @@ export default function omaExtension(pi: ExtensionAPI): void {
 		);
 	};
 
+	// /oma validate — render the scored precision report from the last
+	// validate.sh run. Path is repo-relative by design (developer command);
+	// no argument parsing in v1.
+	const runValidate = async (ctx: ExtensionCommandContext): Promise<void> => {
+		const reportPath = join(ctx.cwd, "test/fixtures/precision/results/report.json");
+		if (!existsSync(reportPath)) {
+			const message = "oma: no report found — run bash test/fixtures/precision/validate.sh first";
+			if (ctx.hasUI) ctx.ui.notify(message, "warning");
+			else console.log(message);
+			return;
+		}
+		let report: ValidateReport;
+		try {
+			// Shape is guaranteed by our own writer (scoreFromResults); a
+			// parse failure here means a truncated/corrupt file.
+			report = JSON.parse(readFileSync(reportPath, "utf8")) as ValidateReport;
+		} catch {
+			const message = "oma: report.json is malformed — re-run validate.sh";
+			if (ctx.hasUI) ctx.ui.notify(message, "warning");
+			else console.log(message);
+			return;
+		}
+		if (ctx.hasUI) {
+			await ctx.ui.custom<boolean | undefined>(
+				(_tui, _theme, keybindings, done) => new ReportScreen(report, keybindings, done),
+				{ overlay: true },
+			);
+			return;
+		}
+		// Headless: stdout is the file-equivalent interface (D3).
+		console.log(renderReportMarkdown(report));
+	};
+
 	const commandOptions = {
 		description: "Interview the project and emit its watchdogs (oma)",
 		getArgumentCompletions: (prefix: string) => {
 			const subcommands = [
 				{ value: "scan", label: "scan", description: "Fan out read-only scouts; write advisor-brief.md" },
-				{ value: "emit", label: "emit", description: "Preview and write WATCHDOG.md + WATCHDOG.yml from kept brief candidates" },
+			{ value: "emit", label: "emit", description: "Preview and write WATCHDOG.md + WATCHDOG.yml from kept brief candidates" },
+			{ value: "validate", label: "validate", description: "Render the scored precision report from the last validate run" },
 			];
 			const matches = subcommands.filter((s) => prefix === "" || s.value.startsWith(prefix));
 			return matches.length > 0 ? matches : null;
@@ -158,6 +195,7 @@ export default function omaExtension(pi: ExtensionAPI): void {
 			const sub = args.trim();
 			if (sub === "scan") return runScan(ctx);
 			if (sub === "emit") return runEmit(ctx);
+			if (sub === "validate") return runValidate(ctx);
 			return runInterview(ctx);
 		},
 	};

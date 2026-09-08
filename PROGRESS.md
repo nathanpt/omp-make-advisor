@@ -1,12 +1,13 @@
 # PROGRESS
 
-Updated: 2026-09-08 (f-007 session)
+Updated: 2026-09-08 (f-008 session)
 
 ## Current repository state
 
-- Git repository initialized (`main`); fourteen commits through the f-006 cutover (foundation
+- Git repository initialized (`main`); twenty commits through the f-008 validator (foundation
   docs → package scaffold → f-001..f-003 slices → install-manifest fix → f-004/f-005
-  emit+preview+precision → f-006 slice 3 stepper → slice 4 edit flow + cutover + docs).
+  emit+preview+precision → f-006 stepper + cutover → f-007 emit + simplify pass → f-008 probe
+  → f-008 validator + scored report).
 - Slices 1–4 complete and passing: `/oma scan` fans out the 4-lens scouts into
   `advisor-brief.md`; bare `/oma` opens the **interview stepper** — one trap per screen with
   inline evidence lines, `3/12` progress bar, keep/edit/drop via SelectList, and a free-text
@@ -15,6 +16,11 @@ Updated: 2026-09-08 (f-007 session)
   deleted — the stepper superseded the batch picker (DESIGN.md §2 names the stepper as THE
   interview surface; accept/cancel/preload contracts migrated to `test/tui/interview.test.ts`;
   f-002 evidence annotated as superseded).
+- f-008 complete and passing: `bash test/fixtures/precision/validate.sh` runs the advisor live
+  over the six precision fixtures (`--session-dir` isolated), scores archived transcripts via
+  `src/validate.ts` into `results/report.json` + `scored-report.md` (gitignored; PROGRESS
+  carries the recorded table), and `/oma validate` renders the report screen (SelectList rows +
+  ScrollView detail) or prints the markdown headless.
 - Toolchain: npm + node ≥22 + `tsc --noEmit`; **bun runs both test suites** (`npm test`,
   `npm run test:tui`); no build step (`omp -e index.ts` loads TS directly). devDeps
   `@oh-my-pi/pi-coding-agent`/`-pi-tui` 18.1.12 vs omp runtime now **18.1.14** (was 18.1.11
@@ -47,20 +53,26 @@ Updated: 2026-09-08 (f-007 session)
 
 ## Active work
 
-None in flight. f-007 is complete and passing. Next feature per selection rule: `f-008`
-(automated validator + scored report; deps f-005 ✓, f-007 ✓).
+None in flight. f-008 is complete and passing. Next feature per selection rule: `f-009`
+(doctor-style staleness nudge; no unmet dependencies).
 
 
 ## Blockers and unknowns
 
 Open questions carried from DESIGN.md §11 (none block the MVP):
 
-1. Does `omp -p --advisor` expose drain/dump semantics sufficient for unattended scoring? Probe
-   before building the automated validator (feature `f-008`).
+1. ~~Does `omp -p --advisor` expose drain/dump semantics sufficient for unattended scoring?~~
+   Resolved: yes — f-008 probe + recorded runs. Caveat found by f-008: in the shared
+   `~/.omp/agent/sessions` tree the `__advisor*.jsonl` projections land minutes after process
+   exit; pass `--session-dir` for prompt, reliable transcripts (see f-008 section).
 2. ~~pi-tui TestBackend vs PTY harness~~ Resolved: PTY harness (`test/tui/host.ts`), bun-spawned,
    JSONL frame events — landed and passing.
 3. Pricing source for cost preview (models.db vs hardcoded).
-4. Scoring judge: string-match on severity vs a judge model.
+4. ~~Scoring judge: string-match on severity vs a judge model.~~ Resolved for v1: case-insensitive
+   keyword match on advise notes (DESIGN §11: a judge needs its own eval). The f-008 recorded
+   run exposes the known tension: build-gate's formatting nit hit keyword `test` without
+   catching the substance — keyword widening or a judge stays a data/eval decision, recorded
+   per-run in the report.
 5. Upstream posture: contribute the extension to the OMP ecosystem or keep it local.
 
 Resolved this session:
@@ -473,17 +485,92 @@ Resolved this session:
   (both-absent byte-identical, mixed md-standing shows the annotated counts form, yml
   written canonical, md sidecar only).
 
+- f-008 (2026-09-08, all pass):
+  - **Scoring engine** (`src/validate.ts`, pure functions + one fs entry): `extractAdvisorTranscript`
+    (per-line JSON.parse in try/catch — torn append-only tails skipped, never fatal; assistant
+    records contribute `usage.cost.total`, distinct `model`, and `toolCall name="advise"` content
+    items as `{note, severity}`, unknown severities coerced to `nit`), `scoreFixture` (hits =
+    case-insensitive substring of expected keywords in any note; verdicts in order — no-run →
+    drop; violation: hits → keep, advises → retune, else drop; clean: silent → keep, noise →
+    retune), `buildReport` (generatedAt `""` — the runner stamps it), `renderReportMarkdown`
+    (golden-pinned), `scoreFromResults` (script entry: expected.json + `<name>.advisor.<slug>.jsonl`
+    globs → report.json + scored-report.md + stdout). `test/validate.test.ts`: extraction incl.
+    malformed-line skip + severity default/coercion + cost over non-advise turns + models,
+    five-path verdict matrix + no-run, markdown golden (highest severity ranking, advise
+    sections, no-run cell, single trailing newline), case-insensitive hits (`Auth` vs
+    `auth failure`).
+  - **Fixture data**: `expected.json` gains per-fixture `task` prompts (exact strings passed to
+    `omp -p --advisor --auto-approve`); one committed `advisor-brief.md` per fixture, GENERATED
+    via `briefToText` (format cannot drift; round-trip + keep-anchor liveness asserted at
+    generation). Drop candidates deliberately cite cross-lens paths that don't resolve in the
+    fixture — dropped at emit, never reach the roster. One plan correction: conc-1 evidence is
+    `src/ingest/loop.ts:1-15` (plan said `1-20`; the file has 15 lines — `verifyEvidenceAnchors`
+    would flag it).
+  - **Live runner** (`test/fixtures/precision/validate.sh`): per fixture — fresh temp copy
+    (`/.` form), headless `/oma emit`, one `timeout 300 omp -p --advisor --auto-approve`
+    turn (nonzero exit warns, never aborts the loop), transcript harvest, then `scoreFromResults`
+    via bun. Exit 0 when every fixture scored, 2 on any no-run (harness failure ≠ advisor
+    miss); verdicts never set the exit code — the report is the product. Per-fixture archives
+    cleared up front so a no-run can never score a previous run's transcripts.
+  - **Discovery — shared sessions tree projects `__advisor*.jsonl` minutes late;
+    `--session-dir` writes directly.** Recorded runs 1–2 scored 6×no-run: harvests polling
+    immediately, +45s/fixture, and +240s global all found nothing, yet every transcript
+    eventually materialized at its final path 1–8 min after the `omp -p` exit (mtimes backdated
+    to mid-turn; slug-dir entries flickered file↔dir across checks). Root cause class: the
+    shared `~/.omp/agent/sessions` tree is broker-synced (`__omp_worker_daemon_broker`,
+    IndexedSessionStorage projections); a custom `--session-dir` bypasses it — verified by a
+    live poll probe: transcript on disk ≤1s after turn end, flat layout, exactly one session
+    per fixture dir (no newest-session disambiguation needed). Runner commits the
+    `--session-dir` shape; the failed runs' session dirs retained under
+    `~/.omp/agent/sessions/-tmp-oma-validate-*` as evidence.
+  - **Report screen** (`src/report.ts`, `/oma validate` in `index.ts`): SelectList rows
+    `${name} · ${statusLine} · ${verdict}` (flagged/off-keyword/silent/noise/clean/no
+    transcript), footer `advisors $X.XXXX · keep K · retune R · drop D`; Enter → ScrollView
+    detail (`- [severity] (slug) note` wrapped, `keywords: … · hits: …`, `cost $… · model …`),
+    Esc detail→list, Esc list→`done(false)` exactly once, dispose idempotent. Missing report →
+    `oma: no report found — run bash test/fixtures/precision/validate.sh first`; malformed →
+    `oma: report.json is malformed — re-run validate.sh` (notify headed, console headless);
+    headless success prints the markdown (D3). PTY snapshot `test/tui/report.test.ts` +
+    `report-host.ts` (fixed 3-fixture report: keep-flagged / retune-noise / drop-no-run).
+    f-007 lesson re-applied: assert wrapped segments, not joined strings (the first run's
+    joined-string assert failed on the 60-col wrap).
+  - **Recorded run** (`bash test/fixtures/precision/validate.sh`, repo root, 2026-09-08, exit 0,
+    158s; results/ gitignored — this is the durable record):
+
+    | fixture | kind | verdict | advises | severity | hits | cost |
+    |---|---|---|---|---|---|---|
+    | conc-map | violation | keep | 1 | concern | lock | $0.0145 |
+    | err-swallow | violation | drop | 0 | — | — | $0.0084 |
+    | data-drift | violation | drop | 0 | — | — | $0.0083 |
+    | build-gate | violation | keep | 1 | nit | test | $0.0186 |
+    | clean-tidy | clean | keep | 0 | — | — | $0.0088 |
+    | clean-empty | clean | keep | 0 | — | — | $0.0044 |
+
+    `Run: 2026-09-08T20:15:23.865Z · advisors $0.0630 · keep 4 · retune 0 · drop 2`. Findings,
+    as-is: conc-map caught in substance (concern — wrap the delete in `withIngestLock`);
+    build-gate's only advise was a formatting nit (dropped leading tab) that hit keyword
+    `test` — keyword-keep without substance catch; err-swallow and data-drift were silent
+    misses (advisors spent $0.0084/$0.0083 reviewing, never advised); both clean fixtures
+    correctly silent — 2/2 specificity at the advisor stage (the f-005 scan-phase
+    clean-fixture false-positive problem does not reproduce here). Advisor models glm-5.3
+    throughout. The plan's keyword-widening contingency (≥2 retunes from keyword misses) did
+    not trigger; no keywords changed.
+  - **Artifact check**: `results/report.json` parses (6 fixtures, totals `{keep 4, retune 0,
+    drop 2}`); `results/scored-report.md` byte-equals `renderReportMarkdown(report)`; six
+    `<name>.advisor.<slug>.jsonl` transcripts archived.
+  - PTY smoke (hub-hosted omp 18.1.14, repo cwd): `/oma validate` → list header + six rows
+    (cursor on conc-map) + footer; Enter → detail (header, wrapped note, keywords/hits,
+    cost/model); Esc → list; Esc → overlay closed, main UI restored, process healthy.
+  - Gates: `npm run typecheck` clean; `npm test` **24 pass**; `npm run test:tui` **11 pass**;
+    `npm run probe` exit 0 `ready`; `./init.sh` `All checks passed.` (all exit codes unpiped).
+
 ## Next useful move
 
-Start `f-008` (automated validator + scored report; deps f-005 ✓, f-007 ✓). The §11 open
-question is RESOLVED by the 2026-09-08 probe (live run, recorded below): `omp -p --advisor`
-is sufficient for unattended advisor scoring. Architecture: per precision fixture — seed
-brief → `/oma emit` → run `omp -p --advisor --auto-approve` with a trap-triggering task →
-extract `advise` calls from `<session>/__advisor.<slug>.jsonl` → keyword-score against
-expected.json (violation: ≥1 advise note hits expected keywords; clean: zero trap
-advisories) → scored report. Second extraction point: `<advisory advisor=… severity=…>`
-elements in the primary session JSONL (not echoed to `-p` stdout text mode — score from
-the JSONL artifacts, not stdout).
+Start `f-009` (doctor-style staleness nudge; deps unmet: none). Per DESIGN §12 and the carried
+note below, the staleness signal is `verifyEvidenceAnchors` reuse at interview/doctor time:
+missing watchdog pair, or brief/watchdog evidence that no longer resolves. Headless variant
+per constraint 3. Watch for scope discipline — v1 is detection + non-destructive nudge, not
+auto-repair.
 
 - f-008 probe (2026-09-08, live): conc-map fixture + emitted WATCHDOG pair;
   `timeout 300 omp -p --advisor --auto-approve "add dropBatch() deleting from batchIndex"`.

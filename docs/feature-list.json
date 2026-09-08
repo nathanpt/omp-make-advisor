@@ -126,8 +126,8 @@
         "Render the scored report (precision, cost, verdict)",
         "Report screen has a snapshot test"
       ],
-      "passes": false,
-      "evidence": null,
+      "passes": true,
+      "evidence": "Step 1: 2026-09-08 probe (PROGRESS 'f-008 probe'; session retained) — omp -p --advisor --auto-approve is sufficient unattended. Steps 2-3: recorded run `bash test/fixtures/precision/validate.sh` (2026-09-08, exit 0, 158s): 6 fixtures scored via src/validate.ts (test/validate.test.ts 5 tests: extraction incl. torn-line skip + severity coercion, verdict matrix + no-run, markdown golden, case-insensitive hits) into results/report.json + scored-report.md (table in PROGRESS: keep 4 · retune 0 · drop 2, advisors $0.0630); runner uses per-fixture --session-dir because the shared sessions tree projects __advisor*.jsonl minutes late (discovery + evidence in PROGRESS f-008 section). Step 4: test/tui/report.test.ts PTY walkthrough (list rows + totals, detail pane, both Esc paths, done/dispose exactly once) — npm run test:tui 11 pass; live PTY smoke of /oma validate on omp 18.1.14 rendered list/detail/close from the real report.json; headless /oma validate prints the markdown. Gates: typecheck clean, npm test 24 pass, ./init.sh 'All checks passed.', npm run probe exit 0 ready.",
       "priority": 8,
       "dependencies": ["f-005", "f-007"],
       "source": "DESIGN.md §10 Next item 3, §6 slice 6, §7"
