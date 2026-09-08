@@ -49,8 +49,8 @@ Same as before: OMP owns the advisor mechanism, nobody owns authoring. Blank `WA
 ## 5. Architecture
 
 ```
-  /make-advisor
-        │
+  /oma  (bare → hub: status rows for scan · interview · emit · validate; ADR-0002)
+        │ enter
         ▼
   ┌───────────┐   task scouts    ┌──────────────┐
   │ scan      │ ───────────────► │ advisor-brief │
@@ -144,6 +144,8 @@ A project can run both: lunchbox narrows the menu, omp-make-advisor sharpens the
 - `WATCHDOG.yml` roster emission (2–3 roles)
 - Automated validator + report screen (slice 6)
 - `doctor` staleness nudge
+- `/oma` status hub (ADR-0002) feeding doctor rows; visual pass — boxed frames,
+  status glyphs, markdown detail panes, render gallery for design iteration
 
 ### Later
 
@@ -166,7 +168,7 @@ A project can run both: lunchbox narrows the menu, omp-make-advisor sharpens the
 | Interview UI | Overlay stepper via ctx.ui.custom | /advisor configure pattern; editor area stays intact |
 | List widget | SelectList, no hand-rolled nav | Boring, themed, tested |
 | Headless | Brief-file fallback via hasUI branch | Zero extra code — state already file-backed |
-| Standing files | never mutate, emit-beside | Trust; user moves |
+| Root command | Bare `/oma` opens the status hub; stages via subcommands | ADR-0002 — orientation over assumption |
 | Scope | OMP only in v1 | Pi subset differs; later + documented |
 
 Decision records: [ADR-0001](../decisions/0001-extension-plus-skill-over-standalone-binary.md) captures the shape decision. Future decision changes get a new ADR in `docs/decisions/` rather than silent edits here.

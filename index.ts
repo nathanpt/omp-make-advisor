@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import type { ExtensionAPI, ExtensionCommandContext } from "@oh-my-pi/pi-coding-agent";
 import { serializeAdvisorConfig } from "./src/advisor-yaml.js";
+import { HubScreen, readHubStatus, renderHubSummary, type HubAction } from "./src/hub.js";
 import { ReportScreen } from "./src/report.js";
 import { renderReportMarkdown, type ValidateReport } from "./src/validate.js";
 import { InterviewStepper, type InterviewDecision } from "./src/interview.js";
@@ -85,6 +86,25 @@ export default function omaExtension(pi: ExtensionAPI): void {
 				(edited > 0 ? `, edited ${edited}` : ""),
 			"info",
 		);
+	};
+
+	// ADR-0002: bare /oma opens the status hub — one row per pipeline stage,
+	// description = live repo state; Enter dispatches to the stage handler
+	// (guards stay there, one guard path). Headless prints the summary.
+	const runHub = async (ctx: ExtensionCommandContext): Promise<void> => {
+		const status = readHubStatus(ctx.cwd);
+		if (!ctx.hasUI) {
+			for (const line of renderHubSummary(status)) console.log(line);
+			return;
+		}
+		const action = await ctx.ui.custom<HubAction | undefined>(
+			(_tui, _theme, keybindings, done) => new HubScreen(status, keybindings, done),
+			{ overlay: true },
+		);
+		if (action === "scan") return runScan(ctx);
+		if (action === "interview") return runInterview(ctx);
+		if (action === "emit") return runEmit(ctx);
+		if (action === "validate") return runValidate(ctx);
 	};
 
 	const runEmit = async (ctx: ExtensionCommandContext): Promise<void> => {
@@ -181,10 +201,11 @@ export default function omaExtension(pi: ExtensionAPI): void {
 	};
 
 	const commandOptions = {
-		description: "Interview the project and emit its watchdogs (oma)",
+		description: "Project watchdog hub: scan, interview, emit, validate (oma)",
 		getArgumentCompletions: (prefix: string) => {
 			const subcommands = [
-				{ value: "scan", label: "scan", description: "Fan out read-only scouts; write advisor-brief.md" },
+			{ value: "scan", label: "scan", description: "Fan out read-only scouts; write advisor-brief.md" },
+			{ value: "interview", label: "interview", description: "Keep/edit/drop each brief trap in the stepper" },
 			{ value: "emit", label: "emit", description: "Preview and write WATCHDOG.md + WATCHDOG.yml from kept brief candidates" },
 			{ value: "validate", label: "validate", description: "Render the scored precision report from the last validate run" },
 			];
@@ -196,7 +217,7 @@ export default function omaExtension(pi: ExtensionAPI): void {
 			if (sub === "scan") return runScan(ctx);
 			if (sub === "emit") return runEmit(ctx);
 			if (sub === "validate") return runValidate(ctx);
-			return runInterview(ctx);
+			return runHub(ctx);
 		},
 	};
 	pi.registerCommand("make-advisor", commandOptions);

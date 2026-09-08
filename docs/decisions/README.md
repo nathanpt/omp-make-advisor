@@ -10,6 +10,7 @@ or deviate from a §12 default.
 | ADR | Title | Status |
 |---|---|---|
 | [0001](0001-extension-plus-skill-over-standalone-binary.md) | Ship as an OMP extension + skill, not a standalone binary | accepted |
+| [0002](0002-bare-oma-routes-to-status-hub.md) | Bare `/oma` routes to a status hub; interview gets an explicit subcommand | accepted |
 
 ## Rules
 

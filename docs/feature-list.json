@@ -146,6 +146,37 @@
       "priority": 9,
       "dependencies": ["f-004"],
       "source": "DESIGN.md §10 Next item 4"
+    },
+    {
+      "id": "f-010",
+      "category": "functional",
+      "description": "Status hub: bare /oma opens a live-state menu of scan/interview/emit/validate; stages get explicit subcommands",
+      "steps": [
+        "ADR-0002 recorded; DESIGN.md §5/§12 updated",
+        "Filesystem status model (brief, watchdog pair, report) reusable outside the overlay",
+        "Hub screen: rows with status, Enter dispatches, Esc closes",
+        "Bare /oma re-routed; /oma interview named; headless /oma prints status + next action",
+        "PTY snapshot test for the hub"
+      ],
+      "passes": true,
+      "evidence": "ADR-0002 + DESIGN.md §5/§12 updated (decisions index too). src/hub.ts readHubStatus (pure fs truth: brief counts, watchdog canonical/sidecar/none per file, dev report none/ready/malformed) + HubScreen (SelectList rows scan/interview/emit/validate·dev, header oma · <project>, footer flow line) + nextAction/renderHubSummary. index.ts: bare + unknown args → runHub; /oma interview named; completion adds interview. test/hub.test.ts 4 pass (empty repo, seeded repo, next-action ladder, malformed report); test/tui/hub.test.ts 2 pass (rows + Enter dispatch done:'scan' exactly once; Esc done:null once; dispose once). Live: hub-hosted omp 18.1.14 in seeded temp repo — /oma rendered all four rows with true state; headless omp -p '/oma' printed summary + 'next: /advisor on'. Gates: typecheck clean, npm test 28, test:tui 13, ./init.sh 'All checks passed.', probe ready.",
+      "priority": 10
+    },
+    {
+      "id": "f-011",
+      "category": "functional",
+      "description": "Visual pass: boxed frames (pi-tui Box), status glyphs, markdown detail panes, render gallery for design iteration",
+      "steps": [
+        "Render gallery script producing static frames of every screen at fixed widths",
+        "Boxed layout on hub and detail panes (OMP-native look)",
+        "Markdown rendering for rule/advise text panes",
+        "Snapshot tests updated to the new frames"
+      ],
+      "passes": false,
+      "evidence": null,
+      "priority": 11,
+      "dependencies": ["f-010"],
+      "source": "DESIGN.md §10 Next; user design session 2026-09-08"
     }
   ]
 }

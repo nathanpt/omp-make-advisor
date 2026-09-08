@@ -1,15 +1,16 @@
 # PROGRESS
 
-Updated: 2026-09-08 (f-008 session)
+Updated: 2026-09-08 (f-010 hub session)
 
 ## Current repository state
 
-- Git repository initialized (`main`); twenty commits through the f-008 validator (foundation
+- Git repository initialized (`main`); twenty-one commits through the f-010 hub (foundation
   docs → package scaffold → f-001..f-003 slices → install-manifest fix → f-004/f-005
   emit+preview+precision → f-006 stepper + cutover → f-007 emit + simplify pass → f-008 probe
-  → f-008 validator + scored report).
+  → f-008 validator + scored report → f-010 status hub + routing).
 - Slices 1–4 complete and passing: `/oma scan` fans out the 4-lens scouts into
-  `advisor-brief.md`; bare `/oma` opens the **interview stepper** — one trap per screen with
+  `advisor-brief.md`; bare `/oma` opens the **status hub** (f-010, ADR-0002) — one row per
+  stage with live state; `/oma interview` opens the **interview stepper** — one trap per screen with
   inline evidence lines, `3/12` progress bar, keep/edit/drop via SelectList, and a free-text
   edit screen (pi-tui `Input`) whose saved title round-trips into the brief; `/oma emit`
   previews and writes the `WATCHDOG.md` + `WATCHDOG.yml` roster pair (f-007). `src/picker.ts` is
@@ -21,6 +22,11 @@ Updated: 2026-09-08 (f-008 session)
   `src/validate.ts` into `results/report.json` + `scored-report.md` (gitignored; PROGRESS
   carries the recorded table), and `/oma validate` renders the report screen (SelectList rows +
   ScrollView detail) or prints the markdown headless.
+- f-010 (ADR-0002): bare `/oma` opens a status hub — one SelectList row per pipeline stage
+  (scan / interview / emit / validate·dev) with live filesystem state as the row description;
+  Enter dispatches to the stage handler, Esc closes. `/oma interview` is the stepper's new
+  explicit name; headless `/oma` prints the summary + next action. The status model
+  (`src/hub.ts readHubStatus`) is pure fs truth — the seed of the f-009 doctor engine.
 - Toolchain: npm + node ≥22 + `tsc --noEmit`; **bun runs both test suites** (`npm test`,
   `npm run test:tui`); no build step (`omp -e index.ts` loads TS directly). devDeps
   `@oh-my-pi/pi-coding-agent`/`-pi-tui` 18.1.12 vs omp runtime now **18.1.14** (was 18.1.11
@@ -53,8 +59,9 @@ Updated: 2026-09-08 (f-008 session)
 
 ## Active work
 
-None in flight. f-008 is complete and passing. Next feature per selection rule: `f-009`
-(doctor-style staleness nudge; no unmet dependencies).
+None in flight. f-010 (hub + routing) is complete and passing. Next per selection rule:
+`f-009` (doctor staleness nudge; deps f-004 ✓) — its detection feeds hub rows — then
+`f-011` (boxed visual pass + render gallery).
 
 
 ## Blockers and unknowns
@@ -564,13 +571,47 @@ Resolved this session:
   - Gates: `npm run typecheck` clean; `npm test` **24 pass**; `npm run test:tui` **11 pass**;
     `npm run probe` exit 0 `ready`; `./init.sh` `All checks passed.` (all exit codes unpiped).
 
+- f-010 (2026-09-08, all pass) — status hub + command re-routing (ADR-0002):
+  - **ADR-0002** (`docs/decisions/0002-bare-oma-routes-to-status-hub.md`): bare `/oma` → hub;
+    `/oma interview` named; unknown args route to the hub (was: interview). DESIGN.md §5 entry
+    label + §12 "Root command" row updated; decisions index updated. Considered and rejected:
+    `/oma hub` alias (front door stays undiscoverable), auto-flow routing (hides the map).
+  - **Status model** (`src/hub.ts`): `readHubStatus(cwd)` — brief presence/counts via
+    `readBrief`, watchdog pair per file (canonical/sidecar/none via emit.ts constants),
+    dev report (none/ready/malformed) from `test/fixtures/precision/results/report.json`.
+    Pure + fs-only (f-007 loader rule respected). `nextAction()` ladder: scan → interview →
+    emit → move sidecars → `/advisor on`. `renderHubSummary()` for headless.
+  - **HubScreen**: SelectList (getSelectListTheme) rows `scan|-interview|emit|validate · dev`,
+    descriptions = live state (`✓ advisor-brief · 6 traps`, `⚠ sidecars to move`,
+    `✓ report 09-08 $0.06`, …), header `oma · <project> · enter open · esc close` (project name
+    answers "which repo am I in"), footer `flow: scan → interview → emit → /advisor on`.
+    Enter → `done(action)`; index.ts dispatches to the existing handlers — guards stay in the
+    handlers, one guard path, blocked rows remain selectable and self-explanatory.
+  - **Routing** (`index.ts`): bare + unknown → `runHub`; `scan|interview|emit|validate`
+    explicit; completion adds `interview`; command description now names the hub. Headless
+    `runHub` prints `renderHubSummary` lines (D3).
+  - Tests: `test/hub.test.ts` (4) — empty repo, seeded repo (sidecar md + canonical yml +
+    ready report), next-action ladder (interview/emit/activate), malformed report. PTY
+    `test/tui/hub.test.ts` (2) + `hub-host.ts` (fixed mid-flow status) — header/rows/footer,
+    Enter → done `scan` exactly once, Esc → done null exactly once, dispose once. Truncation
+    lesson applied same-day: `✓ advisor-brief · 6 traps` renders as `…· 6 trap` at 60 cols —
+    assert surviving segments.
+  - Live smoke (hub-hosted omp 18.1.14, seeded temp repo: conc-map brief 3 traps / 2 kept +
+    canonical standing pair): `/oma` → hub rendered with all four rows showing true state
+    (`✓ advisor-brief · 3 traps`, `✓ 2 of 3 kept`, `✓ pair in place`, `— no report (dev)`).
+    Headless `omp -p "/oma"` in the same repo printed the summary + `next: /advisor on (if not
+    already)`. Enter-dispatch pinned by the PTY test (live Enter would start a paid scan turn).
+  - Gates: `npm run typecheck` clean; `npm test` **28 pass**; `npm run test:tui` **13 pass**;
+    `./init.sh` `All checks passed.`; `npm run probe` exit 0 `ready` (exit codes unpiped).
+
 ## Next useful move
 
-Start `f-009` (doctor-style staleness nudge; deps unmet: none). Per DESIGN §12 and the carried
-note below, the staleness signal is `verifyEvidenceAnchors` reuse at interview/doctor time:
-missing watchdog pair, or brief/watchdog evidence that no longer resolves. Headless variant
-per constraint 3. Watch for scope discipline — v1 is detection + non-destructive nudge, not
-auto-repair.
+Start `f-009` (doctor staleness nudge; deps f-004 ✓). The detection engine is now
+`readHubStatus` — extend it with the staleness signal (`verifyEvidenceAnchors` reuse at
+interview/doctor time per the carried note) and surface warning rows in the hub. Headless
+variant per constraint 3. After that: `f-011` (visual pass — pi-tui Box frames, status
+glyphs, markdown detail panes, and the render-gallery script for design iteration; OMP-native
+boxed look per the 2026-09-08 design session).
 
 - f-008 probe (2026-09-08, live): conc-map fixture + emitted WATCHDOG pair;
   `timeout 300 omp -p --advisor --auto-approve "add dropBatch() deleting from batchIndex"`.
