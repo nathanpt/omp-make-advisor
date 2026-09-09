@@ -1,6 +1,9 @@
 # omp-make-advisor
 
-**Status:** draft, pre-implementation — reframed 2026-09-06 from standalone binary to OMP extension
+**Status:** implemented through f-012 (see PROGRESS.md / docs/feature-list.json) — this document
+remains the design contract; divergence requires an ADR, never a silent edit. Reframed 2026-09-06
+from standalone binary to OMP extension.
+
 **One-liner:** Interview a project, emit the watchdogs that guard it — as an OMP extension with a TUI stepper.
 **Learning goal:** Use this build to learn pretty TUI design on OMP's real stack (`pi-tui` + `ctx.ui.custom()`), applying the vault's TUI design language.
 
@@ -140,12 +143,14 @@ A project can run both: lunchbox narrows the menu, omp-make-advisor sharpens the
 
 ### Next (still v1-ish)
 
-- Edit flow + full interview stepper (slices 3–4)
-- `WATCHDOG.yml` roster emission (2–3 roles)
-- Automated validator + report screen (slice 6)
-- `doctor` staleness nudge
-- `/oma` status hub (ADR-0002) feeding doctor rows; visual pass — boxed frames,
-  status glyphs, markdown detail panes, render gallery for design iteration
+- ~~Edit flow + full interview stepper (slices 3–4)~~ — done (f-006/f-007)
+- ~~`WATCHDOG.yml` roster emission (2–3 roles)~~ — done (f-007)
+- ~~Automated validator + report screen (slice 6)~~ — done (f-008; recorded run in PROGRESS.md)
+- ~~`/oma` status hub (ADR-0002) feeding doctor rows; visual pass — boxed frames, status
+  glyphs, render gallery~~ — done (f-010/f-011/f-012; overlays are fullscreen alternate-screen)
+- `doctor` staleness nudge — next; feeds hub rows via `readHubStatus`
+- Markdown detail panes — deferred (needs an initialized `MarkdownTheme` in PTY hosts;
+  f-011 recorded exception)
 
 ### Later
 
@@ -165,7 +170,7 @@ A project can run both: lunchbox narrows the menu, omp-make-advisor sharpens the
 |---|---|---|
 | Shape | OMP extension + skill | Judgment lives in-session; binary would wrap prompts |
 | Command | `/make-advisor` (`oma`) | Discoverable, short alias |
-| Interview UI | Overlay stepper via ctx.ui.custom | /advisor configure pattern; editor area stays intact |
+| Interview UI | Overlay via ctx.ui.custom; hub/report fullscreen (alt screen), stepper inline | settings-page takeover for orientation surfaces; inline for in-flow work |
 | List widget | SelectList, no hand-rolled nav | Boring, themed, tested |
 | Headless | Brief-file fallback via hasUI branch | Zero extra code — state already file-backed |
 | Root command | Bare `/oma` opens the status hub; stages via subcommands | ADR-0002 — orientation over assumption |
