@@ -31,12 +31,23 @@ export default function omaExtension(pi: ExtensionAPI): void {
 	// batches returning, agent_end closes the phase and reads back the brief.
 	const scanState = { active: false, batches: 0 };
 
+	// Cost visibility (user requirement): every scan entry point names the
+	// models that will bill — the session model runs the main turn and, unless
+	// agent config overrides scout models, the 4 scout subagents too.
+	const scanModelLine = (ctx: ExtensionCommandContext): string | undefined => {
+		const model = ctx.models.current();
+		if (!model) return undefined;
+		return `models: ${model.provider}/${model.id} · 1 main + 4 scout turns`;
+	};
+
 	const runScan = (ctx: ExtensionCommandContext): void => {
 		scanState.active = true;
 		scanState.batches = 0;
-		if (ctx.hasUI) ctx.ui.notify("oma: scan started — 4 read-only scouts fanning out", "info");
+		const modelLine = scanModelLine(ctx);
+		const modelNote = modelLine ? ` — ${modelLine}` : "";
+		if (ctx.hasUI) ctx.ui.notify(`oma: scan started — 4 read-only scouts fanning out${modelNote}`, "info");
+		else console.log(`oma: scan starting${modelNote}`);
 		// Idle: starts the scan turn. Streaming: queues as steer — acceptable here.
-		// Works headless too: no UI calls above when ctx.hasUI is false.
 		pi.sendUserMessage(buildScanPrompt());
 	};
 
@@ -94,11 +105,11 @@ export default function omaExtension(pi: ExtensionAPI): void {
 	const runHub = async (ctx: ExtensionCommandContext): Promise<void> => {
 		const status = readHubStatus(ctx.cwd);
 		if (!ctx.hasUI) {
-			for (const line of renderHubSummary(status)) console.log(line);
+			for (const line of renderHubSummary(status, scanModelLine(ctx))) console.log(line);
 			return;
 		}
 		const action = await ctx.ui.custom<HubAction | undefined>(
-			(_tui, theme, keybindings, done) => new HubScreen(status, keybindings, done, theme),
+			(_tui, theme, keybindings, done) => new HubScreen(status, keybindings, done, theme, scanModelLine(ctx)),
 			// Fullscreen alternate-screen overlay (settings-page idiom): takes
 			// over the window instead of floating above the live composer.
 			{ overlay: true, overlayOptions: { fullscreen: true } },
@@ -206,10 +217,10 @@ export default function omaExtension(pi: ExtensionAPI): void {
 		description: "Project watchdog hub: scan, interview, emit, validate (oma)",
 		getArgumentCompletions: (prefix: string) => {
 			const subcommands = [
-			{ value: "scan", label: "scan", description: "Fan out read-only scouts; write advisor-brief.md" },
-			{ value: "interview", label: "interview", description: "Keep/edit/drop each brief trap in the stepper" },
-			{ value: "emit", label: "emit", description: "Preview and write WATCHDOG.md + WATCHDOG.yml from kept brief candidates" },
-			{ value: "validate", label: "validate", description: "Render the scored precision report from the last validate run" },
+				{ value: "scan", label: "scan", description: "Fan out read-only scouts; write advisor-brief.md" },
+				{ value: "interview", label: "interview", description: "Keep/edit/drop each brief trap in the stepper" },
+				{ value: "emit", label: "emit", description: "Preview and write WATCHDOG.md + WATCHDOG.yml from kept brief candidates" },
+				{ value: "validate", label: "validate", description: "Render the scored precision report from the last validate run" },
 			];
 			const matches = subcommands.filter((s) => prefix === "" || s.value.startsWith(prefix));
 			return matches.length > 0 ? matches : null;
@@ -217,6 +228,7 @@ export default function omaExtension(pi: ExtensionAPI): void {
 		handler: async (args: string, ctx: ExtensionCommandContext): Promise<void> => {
 			const sub = args.trim();
 			if (sub === "scan") return runScan(ctx);
+			if (sub === "interview") return runInterview(ctx);
 			if (sub === "emit") return runEmit(ctx);
 			if (sub === "validate") return runValidate(ctx);
 			return runHub(ctx);

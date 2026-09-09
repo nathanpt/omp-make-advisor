@@ -33,6 +33,7 @@ test("hub: header, four status rows, footer; enter dispatches scan; esc cancels 
 		frameWith(events, "emit · sidecars");
 		frameWith(events, "4 read-only scouts fan out");
 		frameWith(events, "advisor-brief.md · 6 traps");
+		frameWith(events, "models: glm-5.3 · 1 main + 4");
 		frameWith(events, "advisors $0.0630");
 
 		// Enter on the preselected first row dispatches scan.

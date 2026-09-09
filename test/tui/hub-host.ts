@@ -14,4 +14,7 @@ const status: HubStatus = {
 	report: { state: "ready", generatedAt: "2026-09-08T20:15:23.865Z", totalCostUsd: 0.063 },
 };
 
-runOverlayHost((keybindings, done) => new HubScreen(status, keybindings, done), eventsPath);
+runOverlayHost(
+	(keybindings, done) => new HubScreen(status, keybindings, done, undefined, "models: glm-5.3 · 1 main + 4 scout turns"),
+	eventsPath,
+);

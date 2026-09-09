@@ -60,3 +60,7 @@ is a runnable artifact; until then changes accumulate under Unreleased.
   line), status glyphs in the `SelectList` icon column, aligned-facts detail card (severity
   badge, dotted rule, dim label column, model right-aligned); framed single-pane fallback below
   48 cols.
+- Scan cost visibility: every scan entry point names the models that will bill —
+  `/oma scan` toast and headless output, the hub's scan pane, and the headless `/oma` summary
+  all show `<provider>/<id> · 1 main + 4 scout turns` (session model from `ctx.models`; scouts
+  inherit it unless agent config overrides).

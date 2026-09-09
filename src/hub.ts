@@ -170,6 +170,7 @@ export class HubScreen implements Component {
 		private readonly keybindings: KeybindingsLike,
 		private readonly done: (result: HubAction | undefined) => void,
 		private readonly theme: FrameTheme = PLAIN_FRAME_THEME,
+		private readonly scanModelLine?: string,
 	) {
 		const items = stageItems(status);
 		this.list = new SelectList(items, items.length, getSelectListTheme(), { overflowSearch: false });
@@ -214,6 +215,13 @@ export class HubScreen implements Component {
 		for (const line of wrapTextWithAnsi(this.theme.fg("dim", stageMeta(this.active, this.status)), rightW)) {
 			rightLines.push(line);
 		}
+		// Cost visibility (user requirement): the scan pane names the models
+		// that will bill before anyone fans out.
+		if (this.active === "scan" && this.scanModelLine) {
+			for (const line of wrapTextWithAnsi(this.theme.fg("dim", this.scanModelLine), rightW)) {
+				rightLines.push(line);
+			}
+		}
 		const footerRight =
 			this.status.report.state === "ready"
 				? `advisors $${this.status.report.totalCostUsd.toFixed(4)}`
@@ -244,16 +252,18 @@ export function nextAction(status: HubStatus): string {
 	return "/advisor on (if not already)";
 }
 
-export function renderHubSummary(status: HubStatus): string[] {
+export function renderHubSummary(status: HubStatus, scanModelLine?: string): string[] {
 	const rows = [
 		["scan", scanDescription(status)],
 		["interview", interviewDescription(status)],
 		["emit", emitDescription(status)],
 		["validate · dev", validateDescription(status)],
 	] as const;
-	return [
+	const lines = [
 		`oma · ${status.project}`,
 		...rows.map(([label, description]) => `${label.padEnd(15)}${description}`),
-		`next: ${nextAction(status)}`,
 	];
+	if (scanModelLine) lines.push(`  ${scanModelLine}`);
+	lines.push(`next: ${nextAction(status)}`);
+	return lines;
 }
