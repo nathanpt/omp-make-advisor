@@ -99,7 +99,9 @@ export default function omaExtension(pi: ExtensionAPI): void {
 		}
 		const action = await ctx.ui.custom<HubAction | undefined>(
 			(_tui, theme, keybindings, done) => new HubScreen(status, keybindings, done, theme),
-			{ overlay: true },
+			// Fullscreen alternate-screen overlay (settings-page idiom): takes
+			// over the window instead of floating above the live composer.
+			{ overlay: true, overlayOptions: { fullscreen: true } },
 		);
 		if (action === "scan") return runScan(ctx);
 		if (action === "interview") return runInterview(ctx);
@@ -192,7 +194,7 @@ export default function omaExtension(pi: ExtensionAPI): void {
 		if (ctx.hasUI) {
 			await ctx.ui.custom<boolean | undefined>(
 				(_tui, theme, keybindings, done) => new ReportScreen(report, keybindings, done, theme),
-				{ overlay: true },
+				{ overlay: true, overlayOptions: { fullscreen: true } },
 			);
 			return;
 		}

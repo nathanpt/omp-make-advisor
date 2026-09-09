@@ -636,7 +636,11 @@ Resolved this session:
   - Live smoke (hub-hosted omp 18.1.14, seeded repo): `/oma` → split pane with true state;
     DOWN moved the cursor and the right pane flipped to the interview copy; Esc closed cleanly.
   - Gates: `npm run typecheck` clean; `npm test` **28 pass**; `npm run test:tui` **13 pass**;
-    `./init.sh` `All checks passed.` (exit codes unpiped).
+    `./init.sh` `All checks passed.` (exit codes unpiped). Follow-up (same day): both
+    `ctx.ui.custom` call sites pass `overlayOptions: { fullscreen: true }` — alternate-screen
+    takeover, the settings-page idiom — after the user reported the default overlay fighting
+    the composer for layout space; live smoke confirmed the hub paints alone on the alt screen
+    and Esc returns to the session.
 
 ## Next useful move
 
