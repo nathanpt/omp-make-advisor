@@ -64,3 +64,6 @@ is a runnable artifact; until then changes accumulate under Unreleased.
   `/oma scan` toast and headless output, the hub's scan pane, and the headless `/oma` summary
   all show `<provider>/<id> · 1 main + 4 scout turns` (session model from `ctx.models`; scouts
   inherit it unless agent config overrides).
+- Hub scan card: cost facts grouped in the card — `models: … · 1 main + 4 scout turns` and
+  `Last run cost: $X (precision runs, MM-DD)` from the dev report — and the footer right slot
+  always shows the kept count instead of the advisor spend.

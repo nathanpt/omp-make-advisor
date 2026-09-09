@@ -74,7 +74,7 @@ const reportDetail = (): ReportScreen => {
 };
 
 const SCREENS: [name: string, make: () => Component][] = [
-	["hub — status dashboard (bare /oma)", () => new HubScreen(HUB_STATUS, keybindings, () => {})],
+	["hub — status dashboard (bare /oma)", () => new HubScreen(HUB_STATUS, keybindings, () => {}, undefined, "models: glm-5.3 · 1 main + 4 scout turns")],
 	["report — scored list (/oma validate)", () => new ReportScreen(REPORT, keybindings, () => {})],
 	["report — fixture detail (enter)", reportDetail],
 ];

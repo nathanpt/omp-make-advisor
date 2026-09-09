@@ -215,17 +215,26 @@ export class HubScreen implements Component {
 		for (const line of wrapTextWithAnsi(this.theme.fg("dim", stageMeta(this.active, this.status)), rightW)) {
 			rightLines.push(line);
 		}
-		// Cost visibility (user requirement): the scan pane names the models
-		// that will bill before anyone fans out.
-		if (this.active === "scan" && this.scanModelLine) {
-			for (const line of wrapTextWithAnsi(this.theme.fg("dim", this.scanModelLine), rightW)) {
-				rightLines.push(line);
+		// Cost visibility (user requirement): the scan card states what the
+		// last recorded run billed and what models this run will bill — kept
+		// together as one block, not scattered into the footer.
+		if (this.active === "scan") {
+			rightLines.push("");
+			if (this.scanModelLine) {
+				for (const line of wrapTextWithAnsi(this.theme.fg("dim", this.scanModelLine), rightW)) {
+					rightLines.push(line);
+				}
+			}
+			if (this.status.report.state === "ready") {
+				const cost = `Last run cost: $${this.status.report.totalCostUsd.toFixed(4)} (precision runs, ${this.status.report.generatedAt.slice(5, 10)})`;
+				for (const line of wrapTextWithAnsi(this.theme.fg("dim", cost), rightW)) {
+					rightLines.push(line);
+				}
 			}
 		}
-		const footerRight =
-			this.status.report.state === "ready"
-				? `advisors $${this.status.report.totalCostUsd.toFixed(4)}`
-				: `${this.status.brief.kept} of ${this.status.brief.candidates} kept`;
+		const footerRight = this.status.brief.present
+			? `${this.status.brief.kept} of ${this.status.brief.candidates} kept`
+			: undefined;
 		return splitPane(this.theme, safeWidth, leftLines, rightLines, {
 			title: `oma · ${this.status.project}`,
 			footerLeft: "enter open · esc close",
