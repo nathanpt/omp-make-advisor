@@ -5,7 +5,7 @@ import { serializeAdvisorConfig } from "./src/advisor-yaml.js";
 import { HubScreen, readHubStatus, renderHubSummary, type HubAction } from "./src/hub.js";
 import { ReportScreen } from "./src/report.js";
 import { renderReportMarkdown, type ValidateReport } from "./src/validate.js";
-import { InterviewStepper, type InterviewDecision } from "./src/interview.js";
+import { InterviewStepper, type InterviewResult } from "./src/interview.js";
 import { readBrief, verifyEvidenceAnchors, writeBrief, readEvidenceContext } from "./src/brief.js";
 import { buildScanPrompt } from "./src/scan.js";
 import {
@@ -75,26 +75,33 @@ export default function omaExtension(pi: ExtensionAPI): void {
 		// itself stays pure render logic. Null contexts (area-guard dirs,
 		// unresolvable anchors) simply render without inline lines.
 		const evidence = new Map(candidates.map((c) => [c.id, readEvidenceContext(ctx.cwd, c.evidence)]));
-		const result = await ctx.ui.custom<InterviewDecision[] | undefined>(
+		const result = await ctx.ui.custom<InterviewResult | undefined>(
 			(_tui, _theme, keybindings, done) => new InterviewStepper(candidates, evidence, keybindings, done),
-			{ overlay: true },
+			// Fullscreen alternate-screen overlay (settings-page idiom): takes
+			// over the window instead of rendering below the transcript.
+			{ overlay: true, overlayOptions: { fullscreen: true } },
 		);
 		if (!result) {
 			ctx.ui.notify("oma: cancelled - brief unchanged", "info");
 			return;
 		}
-		const byId = new Map(result.map((d) => [d.id, d]));
-		// Write back onto the parsed candidates so evidence and rationale survive.
-		const updated = candidates.map((c) => {
-			const decision = byId.get(c.id);
-			return decision ? { ...c, title: decision.title, status: decision.status } : c;
-		});
+		const byId = new Map(result.decisions.map((d) => [d.id, d]));
+		// Write back onto the parsed candidates so evidence and rationale survive,
+		// then append this session's custom considerations (status "keep").
+		const updated = [
+			...candidates.map((c) => {
+				const decision = byId.get(c.id);
+				return decision ? { ...c, title: decision.title, status: decision.status } : c;
+			}),
+			...result.added,
+		];
 		writeBrief(ctx.cwd, updated);
 		const kept = updated.filter((c) => c.status === "keep").length;
-		const edited = result.filter((d) => candidates.find((c) => c.id === d.id)?.title !== d.title).length;
+		const edited = result.decisions.filter((d) => candidates.find((c) => c.id === d.id)?.title !== d.title).length;
 		ctx.ui.notify(
 			`oma: brief updated — kept ${kept}, dropped ${updated.length - kept}` +
-				(edited > 0 ? `, edited ${edited}` : ""),
+				(edited > 0 ? `, edited ${edited}` : "") +
+				(result.added.length > 0 ? `, added ${result.added.length}` : ""),
 			"info",
 		);
 	};
@@ -175,7 +182,7 @@ export default function omaExtension(pi: ExtensionAPI): void {
 		ctx.ui.notify(
 			mdResult.besideStanding && ymlResult.besideStanding
 				? `oma: wrote ${mdName} + ${ymlName} beside standing files — review, then move into place — enable with /advisor on`
-				: `oma: wrote ${mdName}${mdResult.besideStanding ? " (beside standing)" : ""} + ${ymlName}${ymlResult.besideStanding ? " (beside standing)" : ""} — ${kept.length} traps, ${rosterDoc.advisors.length} advisors — enable with /advisor on`,
+				: `oma: wrote ${mdName}${mdResult.besideStanding ? " (beside standing)" : ""} + ${ymlName}${ymlResult.besideStanding ? " (beside standing)" : ""} — ${kept.length} considerations, ${rosterDoc.advisors.length} advisors — enable with /advisor on`,
 			"info",
 		);
 	};
@@ -218,7 +225,7 @@ export default function omaExtension(pi: ExtensionAPI): void {
 		getArgumentCompletions: (prefix: string) => {
 			const subcommands = [
 				{ value: "scan", label: "scan", description: "Fan out read-only scouts; write advisor-brief.md" },
-				{ value: "interview", label: "interview", description: "Keep/edit/drop each brief trap in the stepper" },
+				{ value: "interview", label: "interview", description: "Review considerations: bulk keep/drop, walk each, add your own" },
 				{ value: "emit", label: "emit", description: "Preview and write WATCHDOG.md + WATCHDOG.yml from kept brief candidates" },
 				{ value: "validate", label: "validate", description: "Render the scored precision report from the last validate run" },
 			];

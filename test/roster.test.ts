@@ -26,9 +26,9 @@ test("roster derives from kept candidates only (dropped lens disappears)", () =>
 	assert.deepEqual(names, ["Error Handling Watcher", "Data Drift Watcher", "Build Gate Watcher"]);
 });
 
-test("roster fallback: no lens-prefixed kept ids yields exactly one Trap Watcher", () => {
+test("roster fallback: no lens-prefixed kept ids yields exactly one Consideration Watcher", () => {
 	const names = buildRosterDoc([candidate("x-1")]).advisors.map((a) => a.name);
-	assert.deepEqual(names, ["Trap Watcher"]);
+	assert.deepEqual(names, ["Consideration Watcher"]);
 });
 
 test("emitted roster validates against OMP's advisor discovery walk", async () => {

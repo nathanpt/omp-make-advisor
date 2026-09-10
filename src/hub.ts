@@ -66,7 +66,9 @@ export function readHubStatus(cwd: string): HubStatus {
 // Headless summary rows stay descriptive (D3: stdout is the interface). The
 // PTY rows are tighter — status glyph in the icon column, compact label.
 function scanDescription(status: HubStatus): string {
-	return status.brief.present ? `✓ advisor-brief · ${status.brief.candidates} traps` : "— run /oma scan first";
+	return status.brief.present
+		? `✓ advisor-brief · ${status.brief.candidates} considerations`
+		: "— run /oma scan first";
 }
 
 function interviewDescription(status: HubStatus): string {
@@ -118,7 +120,7 @@ function stageItems(status: HubStatus): { value: HubAction; icon: string; label:
 		{
 			value: "scan",
 			icon: status.brief.present ? "✓" : "—",
-			label: `scan · ${status.brief.candidates} traps`,
+			label: `scan · ${status.brief.candidates}`,
 		},
 		{
 			value: "interview",
@@ -133,16 +135,16 @@ function stageItems(status: HubStatus): { value: HubAction; icon: string; label:
 // Rich right-pane copy for the split layout: what the stage does + its live
 // artifact line. (Row labels above stay telegraphic.)
 const STAGE_ABOUT: Record<HubAction, string> = {
-	scan: "4 read-only scouts fan out over the repo and write advisor-brief.md with candidate traps per lens.",
-	interview: "Walk every candidate trap: keep, reword, or drop. Decisions write back to the brief.",
-	emit: "Preview and write WATCHDOG.md + WATCHDOG.yml from the kept traps. Standing files stay untouched — sidecars land beside them for review.",
+	scan: "4 read-only scouts fan out over the repo and write advisor-brief.md with candidate considerations per lens.",
+	interview: "Walk every consideration: keep, reword, or drop. Decisions write back to the brief.",
+	emit: "Preview and write WATCHDOG.md + WATCHDOG.yml from the kept considerations. Standing files stay untouched — sidecars land beside them for review.",
 	validate: "Render the scored precision report from the last validate.sh run (this repo's own fixtures).",
 };
 
 function stageMeta(action: HubAction, status: HubStatus): string {
 	switch (action) {
 		case "scan":
-			return status.brief.present ? `advisor-brief.md · ${status.brief.candidates} traps` : "writes advisor-brief.md";
+			return status.brief.present ? `advisor-brief.md · ${status.brief.candidates} considerations` : "writes advisor-brief.md";
 		case "interview":
 			return `edits advisor-brief.md · ${status.brief.kept} kept`;
 		case "emit":

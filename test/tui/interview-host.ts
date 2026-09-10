@@ -1,9 +1,9 @@
 import type { BriefCandidate, EvidenceContext } from "../../src/brief.js";
-import { InterviewStepper, type InterviewDecision } from "../../src/interview.js";
+import { InterviewStepper, type InterviewResult } from "../../src/interview.js";
 import { runOverlayHost } from "./hostlib.js";
 
-// Watch-rule titles: a trap is a future-facing rule for the advisor, not a
-// bug report. Mirrors the shape scouts write into advisor-brief.md.
+// Watch-rule titles: a consideration is a future-facing rule for the advisor,
+// not a bug report. Mirrors the shape scouts write into advisor-brief.md.
 const CANDIDATES: readonly BriefCandidate[] = [
 	{
 		id: "t1",
@@ -59,7 +59,7 @@ const candidates = CANDIDATES.map((c) => ({ ...c, status: dropIds.has(c.id) ? ("
 const evidence: ReadonlyMap<string, EvidenceContext | null> = new Map(
 	Object.entries({ ...DEFAULT_EVIDENCE, ...config.evidence }),
 );
-runOverlayHost<InterviewDecision[]>(
+runOverlayHost<InterviewResult | undefined>(
 	(keybindings, done) => new InterviewStepper(candidates, evidence, keybindings, done),
 	eventsPath,
 );

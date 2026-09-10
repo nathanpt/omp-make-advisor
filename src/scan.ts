@@ -17,7 +17,7 @@ tasks using your task/subagent tool, one per lens:
    repoint, or run under the wrong defaults; generated code that can go stale; config that
    can diverge from the code it drives.
 
-A trap is NOT a report of a bug that exists today. It is a watch-rule for this project's
+A consideration is NOT a report of a bug that exists today. It is a watch-rule for this project's
 advisor: a concrete, project-specific statement of what a future change must not do (or must
 always do) in a given area, derived from fragile patterns, load-bearing invariants, or past
 near-misses visible in the code and history. You may consult git history for recurring

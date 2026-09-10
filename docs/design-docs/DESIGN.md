@@ -47,7 +47,10 @@ Same as before: OMP owns the advisor mechanism, nobody owns authoring. Blank `WA
 | Brief | The interview state file (`advisor-brief.md`): candidates + per-trap status — doubles as headless fallback |
 | Watchdog pair | Emitted `WATCHDOG.md` + `WATCHDOG.yml` |
 | Fixture | Planted violation (or clean negative) used to score the advisor |
-| Precision run | Advisor over fixtures: flagged / missed per trap |
+
+> 2026-09-09 (f-013): the user-facing term is **consideration** (formerly "trap"; code identifiers
+> like `CandidateTrap` keep the old name). Brief blocks may omit the `Evidence:` line —
+> user-authored custom considerations carry no anchor (parsed as `evidence: ""`).
 
 ## 5. Architecture
 
@@ -63,9 +66,11 @@ Same as before: OMP owns the advisor mechanism, nobody owns authoring. Blank `WA
                                         │  direct file edit (headless)
                                         ▼
                                  ┌──────────────┐
-                                 │ interview    │  SelectList per trap:
-                                 │ ctx.ui.custom│  keep / edit / drop
-                                 │ overlay      │  evidence inline, % bar
+                                 │ interview    │  menu first (walk each / bulk
+                                 │ ctx.ui.custom│  keep-all / drop-all / add or
+                                 │ overlay      │  remove custom / save & exit),
+                                 │              │  then one consideration per
+                                 │              │  screen: keep / edit / drop
                                  └──────┬───────┘
                                         ▼
                                  ┌──────────────┐

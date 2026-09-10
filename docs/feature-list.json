@@ -1,5 +1,5 @@
 {
-  "updated": "2026-09-08",
+  "updated": "2026-09-09",
   "selection_rule": "Take exactly one highest-priority feature with passes=false whose dependencies all pass. Update only passes/evidence/updated when checks succeed; never weaken or delete requirements.",
   "features": [
     {
@@ -33,7 +33,9 @@
       "passes": true,
       "evidence": "typecheck/test/probe pass + interactive /make-advisor and /oma notify verified; superseded 2026-09-08 by f-006: bare /oma opens the interview stepper, accept/cancel/preload contracts migrated to test/tui/interview.test.ts (picker + host deleted)",
       "priority": 2,
-      "dependencies": ["f-001"],
+      "dependencies": [
+        "f-001"
+      ],
       "source": "DESIGN.md §6 slice 2, §10 MVP item 1"
     },
     {
@@ -49,7 +51,9 @@
       "passes": true,
       "evidence": "npm run test:e2e (OMA_E2E=1): scan wrote 11-candidate brief in planted fixture, all evidence paths exist; interactive PTY /oma scan: start + scout-batch notifies, brief written; /oma picker preload + status write-back + Esc byte-identical verified; brief round-trip + reload-status tests in test/brief.test.ts; typecheck/test/test:tui/probe green; post-self-scan hardening: verifyEvidenceAnchors flags unresolvable/past-EOF anchors at settle (unit-tested)",
       "priority": 3,
-      "dependencies": ["f-002"],
+      "dependencies": [
+        "f-002"
+      ],
       "source": "DESIGN.md §10 MVP item 2, §6 slice 5 (minimal)"
     },
     {
@@ -65,7 +69,9 @@
       "passes": true,
       "evidence": "typecheck clean; npm test 11 pass (emit golden byte-exact + round-trip + clobber matrix); test:tui 6 pass (preview apply/cancel/scroll); probe exit 0 ready; ./init.sh INIT_EXIT=0; live PTY /oma emit: Enter wrote WATCHDOG.md cmp-identical to buildWatchdogMd, standing-file conflict wrote WATCHDOG.oma.md with standing md5 unchanged, Esc wrote nothing (PROGRESS.md 2026-09-08)",
       "priority": 4,
-      "dependencies": ["f-003"],
+      "dependencies": [
+        "f-003"
+      ],
       "source": "DESIGN.md §10 MVP item 3, §6 slice 4"
     },
     {
@@ -82,7 +88,9 @@
       "passes": true,
       "evidence": "bash test/fixtures/precision/run.sh (6 live headless scans, exit 0, briefs archived): 3/4 violations flagged with resolving evidence (conc-map 12/12, data-drift 6/6, build-gate 9/9); err-swallow keyword-miss with substance caught (9/11 resolved); clean negatives false-positived (clean-tidy 9, clean-empty 1 resolving candidates) — recorded as-is per pinned rule; per-fixture table in PROGRESS.md 2026-09-08",
       "priority": 5,
-      "dependencies": ["f-004"],
+      "dependencies": [
+        "f-004"
+      ],
       "source": "DESIGN.md §10 MVP item 4, §7"
     },
     {
@@ -98,7 +106,9 @@
       "passes": true,
       "evidence": "typecheck clean; npm test 12 pass (readEvidenceContext matrix); test:tui 10 pass — 7 stepper PTY tests (walkthrough with inline evidence + 3/3 bar, drop, cancel, preload, edit-save round-trip, edit-esc revert, empty-submit guard); probe exit 0 ready; ./init.sh INIT_EXIT=0; live PTY (omp 18.1.14, fixture brief): /oma walk keep/edit/drop → toast 'oma: brief updated — kept 2, dropped 1, edited 1', brief on disk carries the edited title and flipped status with evidence/rationale intact; reopen + Esc → 'oma: cancelled - brief unchanged', md5 byte-identical",
       "priority": 6,
-      "dependencies": ["f-003"],
+      "dependencies": [
+        "f-003"
+      ],
       "source": "DESIGN.md §10 Next item 1, §6 slices 3-4"
     },
     {
@@ -113,7 +123,9 @@
       "passes": true,
       "evidence": "test/roster.test.ts discovery walk (discoverAdvisorConfigs on emitted WATCHDOG.yml: names in order, @slow model, read/grep/glob tools, attribution in sharedInstructions); test/emit.test.ts golden (key order name→model→tools→instructions, quoted \"@slow\", |2- literal blocks, single trailing newline) + round-trip (loadWatchdogConfigFile→serialize byte-identical) + vendored-vs-OMP serializer equivalence on chomp/tool/enabled edges; headless omp -p '/oma emit' in temp dir wrote both files, discovery spot-check exact, sidecar re-run byte-identical; live PTY: dual preview headers, toast 'oma: wrote WATCHDOG.md + WATCHDOG.yml — 2 traps, 2 advisors — enable with /advisor on', sidecar names on standing files, Esc on yml preview cancels with nothing written; typecheck/probe/test:tui/init.sh green",
       "priority": 7,
-      "dependencies": ["f-004"],
+      "dependencies": [
+        "f-004"
+      ],
       "source": "DESIGN.md §10 Next item 2"
     },
     {
@@ -129,7 +141,10 @@
       "passes": true,
       "evidence": "Step 1: 2026-09-08 probe (PROGRESS 'f-008 probe'; session retained) — omp -p --advisor --auto-approve is sufficient unattended. Steps 2-3: recorded run `bash test/fixtures/precision/validate.sh` (2026-09-08, exit 0, 158s): 6 fixtures scored via src/validate.ts (test/validate.test.ts 5 tests: extraction incl. torn-line skip + severity coercion, verdict matrix + no-run, markdown golden, case-insensitive hits) into results/report.json + scored-report.md (table in PROGRESS: keep 4 · retune 0 · drop 2, advisors $0.0630); runner uses per-fixture --session-dir because the shared sessions tree projects __advisor*.jsonl minutes late (discovery + evidence in PROGRESS f-008 section). Step 4: test/tui/report.test.ts PTY walkthrough (list rows + totals, detail pane, both Esc paths, done/dispose exactly once) — npm run test:tui 11 pass; live PTY smoke of /oma validate on omp 18.1.14 rendered list/detail/close from the real report.json; headless /oma validate prints the markdown. Gates: typecheck clean, npm test 24 pass, ./init.sh 'All checks passed.', npm run probe exit 0 ready.",
       "priority": 8,
-      "dependencies": ["f-005", "f-007"],
+      "dependencies": [
+        "f-005",
+        "f-007"
+      ],
       "source": "DESIGN.md §10 Next item 3, §6 slice 6, §7"
     },
     {
@@ -144,7 +159,9 @@
       "passes": false,
       "evidence": null,
       "priority": 9,
-      "dependencies": ["f-004"],
+      "dependencies": [
+        "f-004"
+      ],
       "source": "DESIGN.md §10 Next item 4"
     },
     {
@@ -175,7 +192,9 @@
       "passes": false,
       "evidence": "Steps 1, 2, 4 pass: scripts/gallery.ts (npm run gallery) renders hub/report-list/report-detail at widths 60+80; src/frame.ts frame() + FrameTheme (real uiTheme via ctx.ui.custom in production, PLAIN_FRAME_THEME fallback in hosts) frames hub + report list + report detail with title/footer rows, OMP-native rounded Box look; test/tui hub+report snapshot tests updated to framed layout (13 TUI pass), live PTY smoke showed the framed hub with real theme colors over omp 18.1.14 welcome screen; gates green (28 unit, init.sh All checks passed, probe ready). Step 3 (Markdown rendering for rule/advise panes) DEFERRED with cause: pi-tui Markdown requires a MarkdownTheme and getMarkdownTheme() dereferences OMP's global theme unguarded — throws in PTY hosts where no theme is initialized. Unblock options recorded in PROGRESS f-011: initialize theme in hosts (initThemeSync) or inject a MarkdownTheme; revisit with the interview/preview restyle. NOT marked passing — step 3 unmet.",
       "priority": 11,
-      "dependencies": ["f-010"],
+      "dependencies": [
+        "f-010"
+      ],
       "source": "DESIGN.md §10 Next; user design session 2026-09-08"
     },
     {
@@ -192,8 +211,32 @@
       "passes": true,
       "evidence": "User design review 2026-09-08 picked Option B + Detail i from compared mockups. src/frame.ts splitPane() (boxRound tee junctions, FrameTheme.fg extended with verified success/warning/error tokens, boxDotted rule). HubScreen: stageItems() puts status glyphs in the SelectList icon column (label+description columns do not render below width 40 — select-list.ts:445 — discovered and worked around with icon+compact label); onSelectionChange drives the right pane (STAGE_ABOUT + stageMeta); footer right shows advisors cost or kept count; <48 cols falls back to the framed single pane. ReportScreen.buildDetailRows(): severity-toned badge, wrapped note, dotted rule, dim label column (padEnd before coloring for ANSI-safe widths), hits in success tone, model right-aligned. test/hub.test.ts + test/tui hub+report updated (28 unit + 13 TUI pass); gallery renders the split pane at 60+80; live smoke in omp 18.1.14 seeded repo: split hub with true state, DOWN flipped the right pane to interview copy, Esc closed cleanly; ./init.sh All checks passed.",
       "priority": 12,
-      "dependencies": ["f-010", "f-011"],
+      "dependencies": [
+        "f-010",
+        "f-011"
+      ],
       "source": "User design session 2026-09-08 (Option B + Detail i)"
+    },
+    {
+      "id": "f-013",
+      "category": "functional",
+      "description": "Interview menu-first flow: bulk keep-all/drop-all, user-authored custom considerations (evidence optional), user-facing term 'trap' renamed to 'consideration'",
+      "steps": [
+        "parseBrief treats a missing Evidence: line as evidence \"\" instead of skipping; briefToText omits the Evidence: line when empty; readEvidenceContext and verifyEvidenceAnchors skip empty evidence",
+        "buildWatchdogMd renders evidence-less bullets without the (...) paren; FALLBACK_ROLE renamed Trap Watcher -> Consideration Watcher",
+        "InterviewStepper opens on a menu (walk each / keep all / drop all / add custom / save & exit) with live kept/dropped header; InterviewResult {decisions, added} replaces the bare decisions array",
+        "Add-custom form: title (required) + evidence/rationale (optional) sequential Input screens; nextCustomId() allocates custom-K; esc aborts with no partial entry",
+        "runInterview maps decisions onto originals, appends added, toast reports edited/added counts; hub + completions + scan prompt prose renamed to considerations",
+        "TUI tests: menu-first walkthrough updates plus keep-all, drop-all, add-custom, custom-esc flows; headless + live PTY smoke"
+      ],
+      "passes": true,
+      "evidence": "2026-09-09: ./init.sh green (typecheck, 30 unit, 17 TUI). Headless: hand-appended evidence-less custom block parses (skipped=0), emits '- **Keep functions under 30 lines**' with no paren, summary shows 'advisor-brief · 4 considerations', settle warning silent for custom-1. Live PTY (omp 18.1.15, conc-map fixture): menu header 'Considerations · kept 2 · dropped 1', keep-all -> 'kept 3 · dropped 0', add custom title+skipped optionals -> '(1 added)', save & exit toast 'kept 4, dropped 0, added 1', advisor-brief.md gains '## custom-1 · keep — Keep functions under 30 lines' with no Evidence: line; hub row 'scan · 3'.",
+      "priority": 13,
+      "dependencies": [
+        "f-006",
+        "f-010"
+      ],
+      "source": "User request 2026-09-09 (bulk actions, custom considerations, terminology rename)"
     }
   ]
 }

@@ -4,7 +4,7 @@ import { join } from "node:path";
 export interface CandidateTrap {
 	id: string;
 	title: string;
-	evidence: string;
+	evidence: string; // "" = none (user-authored custom considerations)
 }
 
 export interface BriefCandidate extends CandidateTrap {
@@ -39,7 +39,7 @@ interface OpenBlock {
 	id: string;
 	status: "keep" | "drop";
 	title: string;
-	evidence: string | null;
+	evidence: string; // "" until an Evidence: line is seen
 	rationale: string;
 }
 
@@ -53,7 +53,7 @@ export function parseBrief(text: string): BriefParseResult {
 		if (!current) return;
 		const block = current;
 		current = null;
-		if (block.evidence === null || block.title.trim() === "" || seen.has(block.id)) {
+		if (block.title.trim() === "" || seen.has(block.id)) {
 			skipped += 1;
 			return;
 		}
@@ -76,7 +76,7 @@ export function parseBrief(text: string): BriefParseResult {
 					id: start[1],
 					status: normalizeStatus(start[2]),
 					title: start[3],
-					evidence: null,
+					evidence: "",
 					rationale: "",
 				};
 			}
@@ -100,7 +100,8 @@ export function briefToText(candidates: readonly BriefCandidate[]): string {
 	const head = [HEADER, "", COMMENT, ""].join("\n");
 	if (candidates.length === 0) return head;
 	const blocks = candidates.map((c) => {
-		const lines = [`## ${c.id} · ${c.status} — ${c.title}`, `Evidence: ${c.evidence}`];
+		const lines = [`## ${c.id} · ${c.status} — ${c.title}`];
+		if (c.evidence !== "") lines.push(`Evidence: ${c.evidence}`);
 		if (c.rationale !== "") lines.push(`Rationale: ${c.rationale}`);
 		return lines.join("\n");
 	});
@@ -138,6 +139,7 @@ export function readEvidenceContext(
 	evidence: string,
 	maxLines = 5,
 ): EvidenceContext | null {
+	if (evidence === "") return null; // custom considerations carry no anchor
 	const ranged = EVIDENCE_RANGE.exec(evidence);
 	let content: string;
 	try {
@@ -180,6 +182,7 @@ export function verifyEvidenceAnchors(
 ): AnchorFailure[] {
 	const failures: AnchorFailure[] = [];
 	for (const candidate of candidates) {
+		if (candidate.evidence === "") continue; // custom considerations carry no anchor
 		const ranged = EVIDENCE_RANGE.exec(candidate.evidence);
 		const abs = join(cwd, ranged ? ranged[1] : candidate.evidence);
 		let lines = 0;

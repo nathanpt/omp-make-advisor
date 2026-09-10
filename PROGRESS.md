@@ -1,6 +1,6 @@
 # PROGRESS
 
-Updated: 2026-09-08 (f-012 split-pane session)
+Updated: 2026-09-09 (f-013 menu/bulk/custom session)
 
 ## Current repository state
 
@@ -642,14 +642,76 @@ Resolved this session:
     the composer for layout space; live smoke confirmed the hub paints alone on the alt screen
     and Esc returns to the session.
 
+## f-013 (2026-09-09, all pass) — interview menu, bulk actions, custom considerations, terminology rename
+
+- **Brief schema** (`src/brief.ts`): a missing `Evidence:` line now parses to `evidence: ""` instead of
+  skipping the block (custom considerations carry no anchor); skip conditions reduced to empty title /
+  duplicate id. `briefToText` omits the `Evidence:` line when empty; `readEvidenceContext` and
+  `verifyEvidenceAnchors` short-circuit on `""` — customs never produce preview lines or settle warnings.
+  Scan prompt prose renamed trap → consideration; block grammar byte-identical (parser contract).
+- **Emit** (`src/emit.ts`): evidence-less bullets render `- **title**` / `- **title** — rationale`
+  (no paren); `FALLBACK_ROLE` renamed to `Consideration Watcher`.
+- **Interview** (`src/interview.ts`): opens on a menu (`walk each / keep all / drop all / add custom /
+  save & exit`) with a live `Considerations · kept K · dropped D · esc cancel` header reading effective
+  state (bulk verdicts when set, else brief statuses). `done` now yields
+  `InterviewResult { decisions, added }`; save & exit falls back to bulk, else a completed walk's
+  decisions, else the identity. Add-custom: title (required) → evidence (optional) → rationale
+  (optional) sequential `Input`s; `nextCustomId()` allocates `custom-K` across original ∪ added ids;
+  esc anywhere aborts with no partial entry. Walk headers renamed `Consideration n/m …` /
+  `Edit consideration n/m …`; walk skips the `Evidence:` line for `evidence: ""` originals.
+- **Wiring** (`index.ts`): `runInterview` maps decisions onto originals, appends `result.added`,
+  writes once; toast `oma: brief updated — kept K, dropped D[, edited E][, added A]`. Emit toast and
+  `/oma interview` completion renamed to considerations.
+- **Hub** (`src/hub.ts`): PTY row `scan · N` (noun dropped for the narrow pane), headless
+  `✓ advisor-brief · N considerations`, `advisor-brief.md · N considerations` meta, STAGE_ABOUT copy
+  for scan/interview/emit renamed.
+- Tests: `test/brief.test.ts` +3 (evidence-less parse / round-trip omits line / verify ignores);
+  `test/tui/interview.test.ts` rewritten menu-first (+4: keep-all, drop-all, add-custom, custom-esc;
+  stale-frame-safe `stepDown` anchor helper for post-revisit menu navigation); `test/tui/hub.test.ts`
+  rows pinned to the new strings; host types `runOverlayHost<InterviewResult | undefined>`.
+- Headless proof (conc-map fixture + hand-appended `## custom-1 · keep — …` block, no Evidence line):
+  parseBrief `skipped=0`, `omp -p "/oma emit"` writes `- **Keep functions under 30 lines**`
+  (no paren, roster stays lens-derived), `omp -p "/oma"` shows `✓ advisor-brief · 4 considerations`,
+  settle warning silent for custom-1.
+- Live PTY smoke (hub-hosted omp 18.1.15, seeded conc-map repo): menu header
+  `Considerations · kept 2 · dropped 1 · esc cancel`; `keep all` → `kept 3 · dropped 0`; add custom
+  (`Keep functions under 30 lines`, both optionals skipped) → `add custom (1 added)`; `save & exit` →
+  toast `oma: brief updated — kept 4, dropped 0, added 1`; on disk `data-1` flipped to keep and
+  `## custom-1 · keep — Keep functions under 30 lines` appended with no `Evidence:` line; hub row
+  `scan · 3` observed pre-interview. Driver lesson (recorded): hub key sends with default `enter`
+  append a carriage return — type-then-submit sends double-submit Input screens; pace one byte per
+  transition and anchor waits on fresh frames only.
+- Gates: `npm run typecheck` clean; `npm test` **30 pass**; `npm run test:tui` **17 pass**;
+  `./init.sh` `All checks passed.` (exit codes unpiped).
+- Follow-up (same day, user report): the interview rendered **below the transcript** instead of
+  taking over the window — the f-011 fullscreen cutover (`overlayOptions: { fullscreen: true }`)
+  had covered the hub and report call sites but missed `runInterview`. Fixed in `index.ts`; the
+  preview confirm dialog intentionally stays floating (short confirm, not a workspace). Verified
+  by raw PTY capture (`script` typescript, 80x24): exactly one `\x1b[?1049h` 161 bytes before the
+  menu header `Considerations · kept 2 · dropped 1` and one `\x1b[?1049l` after Esc — the overlay
+  owns the alt screen for the whole interview. Re-run gates green (30 unit / 17 TUI / init.sh 0).
+- Follow-up 2 (same day, user review): add-custom field semantics are now visible in the UI — each
+  form screen renders a helper line under its header (title: the complete rule, one line,
+  "Any change to X must Y", not a short label; evidence: optional source anchor forms; rationale:
+  optional why). Cancelling a committed custom no longer requires a brief edit: a `remove custom`
+  row (present only while `added` is non-empty) opens a manage SelectList of this session's added
+  customs — Enter deletes and the menu suffix count updates; Esc backs out without deleting.
+  Live PTY (omp 18.1.15): helper lines render on all three screens; add → remove via manage →
+  `save & exit` → toast `kept 2, dropped 1` and the brief is byte-identical to the seed (md5
+  `199dbe56…`). Tests: new `remove custom` PTY test (add → esc-from-manage → delete → identity
+  save); add-custom test extended (remove row appears, helper text asserted, save row moved by the
+  extra menu row). Gates re-run green (30 unit / 18 TUI / init.sh 0).
+
 ## Next useful move
 
 Start `f-009` (doctor staleness nudge; deps f-004 ✓). The detection engine is now
 `readHubStatus` — extend it with the staleness signal (`verifyEvidenceAnchors` reuse at
 interview/doctor time per the carried note) and surface warning rows in the hub. Headless
-variant per constraint 3. `f-011`/`f-012` (visual pass, split-pane hub) are done — the gallery
-(`npm run gallery`) remains the tool for further styling experiments; interview/preview
-restyle can adopt the same frame/split language when picked up.
+variant per constraint 3. `f-011`/`f-012`/`f-013` are done — the gallery (`npm run gallery`)
+remains the tool for further styling experiments; the interview's new menu screen can adopt
+the frame/split language when a visual pass is picked up. Custom considerations currently
+ride the fallback advisor only when no lens-prefixed ids are kept (lens selection for
+customs is out of scope for v1).
 
 - f-008 probe (2026-09-08, live): conc-map fixture + emitted WATCHDOG pair;
   `timeout 300 omp -p --advisor --auto-approve "add dropBatch() deleting from batchIndex"`.

@@ -19,9 +19,11 @@ export interface EmitResult {
 // needs no escaping layer. All-dropped input renders the header plus an
 // empty list (callers guard, the function stays total).
 export function buildWatchdogMd(candidates: readonly BriefCandidate[]): string {
-	const bullets = candidates
-		.filter((c) => c.status === "keep")
-		.map((c) => (c.rationale === "" ? `- **${c.title}** (${c.evidence})` : `- **${c.title}** (${c.evidence}) — ${c.rationale}`));
+	const bullet = (c: BriefCandidate): string => {
+		if (c.evidence === "") return c.rationale === "" ? `- **${c.title}**` : `- **${c.title}** — ${c.rationale}`;
+		return c.rationale === "" ? `- **${c.title}** (${c.evidence})` : `- **${c.title}** (${c.evidence}) — ${c.rationale}`;
+	};
+	const bullets = candidates.filter((c) => c.status === "keep").map(bullet);
 	return [
 		"# Watchdog notes",
 		"",
@@ -49,7 +51,7 @@ const LENS_ROLES: Record<Lens, { name: string; focus: string }> = {
 	data: { name: "Data Drift Watcher", focus: "Watch for schema, migration, and fixture drift, and external data shapes consumed without validation." },
 	build: { name: "Build Gate Watcher", focus: "Watch for reordered or repointed scripts and flags, stale generated code, and config diverging from the code it drives." },
 };
-const FALLBACK_ROLE = { name: "Trap Watcher", focus: "Watch for the project-specific watch-rules recorded in WATCHDOG.md." };
+const FALLBACK_ROLE = { name: "Consideration Watcher", focus: "Watch for the project-specific watch-rules recorded in WATCHDOG.md." };
 
 export function buildRosterDoc(candidates: readonly BriefCandidate[]): WatchdogConfigDoc {
 	const counts = new Map<Lens, number>();

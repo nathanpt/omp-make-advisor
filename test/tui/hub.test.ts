@@ -28,11 +28,11 @@ test("hub: header, four status rows, footer; enter dispatches scan; esc cancels 
 		const events = await host.waitUntil((es) => es.some((e) => (e as Event).type === "frame"));
 		frameWith(events, "oma · demo");
 		frameWith(events, "enter open · esc close");
-		frameWith(events, "scan · 6 traps");
+		frameWith(events, "scan · 6");
 		frameWith(events, "interview · 4/6");
 		frameWith(events, "emit · sidecars");
 		frameWith(events, "4 read-only scouts fan out");
-		frameWith(events, "advisor-brief.md · 6 traps");
+		frameWith(events, "advisor-brief.md · 6");
 		frameWith(events, "models: glm-5.3 · 1 main + 4");
 		frameWith(events, "Last run cost: $0.0630");
 		frameWith(events, "4 of 6 kept");
